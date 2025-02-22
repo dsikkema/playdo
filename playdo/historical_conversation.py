@@ -8,33 +8,27 @@ defaulting to None. If a conversation is chosen, it loads the conversation from 
 and prints it out.
 
 Then it enters the chatloop, initialized if needed with previous messages. After each
-message, it saves the conversation to the database.
+message exchange, it saves only the new messages to the database.
 
 """
 import sys
-from typing import Optional
+from typing import Optional, List
 
 import anthropic
 from playdo.response_getter import ResponseGetter
 from playdo.conversation_history_repository import ConversationHistoryRepository
-from playdo.models import ConversationHistory
+from playdo.models import ConversationHistory, PlaydoMessage
 import logging
 logger = logging.getLogger('playdo')
 
 class HistoricalConversation:
     def __init__(self, conversation_history: ConversationHistoryRepository, response_getter: ResponseGetter):
-        self.conversation_history: ConversationHistoryRepository
-        self.response_getter: ResponseGetter
         self.conversation_history = conversation_history
         self.response_getter = response_getter
 
     def _prompt_for_conversation_id(self) -> int | None:
         """
-        Display available conversation IDs and prompt the user to select one. Show them as a numbered list
-        and ask the user to enter the number corresponding to the conversation they want to load. Validate
-        that input is a valid integer and that it corresponds to a conversation ID.
-
-        If no conversations IDs exist, return None.
+        Display available conversation IDs and prompt the user to select one.
         """
         conversation_ids = self.conversation_history.get_all_conversation_ids()
 
@@ -46,8 +40,7 @@ class HistoricalConversation:
             print("Available conversations:")
             for id in conversation_ids:
                 print(f"{id}")
-            user_input = input("Enter the number of the conversation to load: ")
-            # validate user_input is an integer and that it corresponds to a conversation ID
+            user_input = input("Enter the number of the conversation to load (or press Enter for new): ")
             if not user_input:
                 valid_input_received = True
                 choice = None
@@ -67,7 +60,7 @@ class HistoricalConversation:
         conversation_id = self._prompt_for_conversation_id()
         conversation: Optional[ConversationHistory]
 
-        # load conversation (a list of messages) from database if one is chosen
+        # load conversation from database if one is chosen
         if conversation_id is not None:
             conversation = self.conversation_history.get_conversation(conversation_id)
             logger.debug(f"Loaded conversation {conversation=}")
@@ -79,8 +72,15 @@ class HistoricalConversation:
         self._chatloop(conversation)
 
     def _chatloop(self, conversation: ConversationHistory):
+        """
+        Functions by taking all messages from conversation history (which is an empty list if it's a new
+        conversation), and passing them into the response_getter, which returns a new message list
+        with new messages added to the end.
+
+        After each response, it saves only the new messages to the database.
+        """
         if conversation is None:
-            conversation = self.conversation_history.save_new_conversation(ConversationHistory(id=None, messages=[]))
+            conversation = self.conversation_history.create_new_conversation()
             print(f"You're in a brand new conversation: ID={conversation.id}")
             logger.debug(f"Created new conversation {conversation=}")
 
@@ -96,11 +96,17 @@ class HistoricalConversation:
             except KeyboardInterrupt:
                 print("\nInput interrupted")
                 user_query = ""
+
             try:
-                messages = self.response_getter._get_next_assistant_resp(conversation.messages, user_query)
+                # Get updated messages from response getter
+                new_messages = self.response_getter._get_next_assistant_resp(conversation.messages, user_query)
+                
+                # Save only the new messages
+                conversation = self.conversation_history.add_messages_to_conversation(conversation.id, new_messages)
+                
+                # Print the assistant's response (last message)
+                print(f"\nAssistant: {new_messages[-1].content[0].text}\n")
+                
             except anthropic.InternalServerError as e:
                 print(f"Error: {e}")
                 continue
-            conversation.messages = messages
-            conversation = self.conversation_history.upsert_conversation(conversation)
-            print(f"\nAssistant: {messages[-1].content[0].text}\n")

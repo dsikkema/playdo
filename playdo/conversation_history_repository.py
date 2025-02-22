@@ -1,90 +1,97 @@
 """
 This module implements a class for managing the conversation history.
 
-The schema of the database is stored in the following schema initialization file: `schema.sql`.
-
-It interfaces with the following table:
-```
-CREATE TABLE conversation (
-    id integer primary key autoincrement,
-    created_at datetime default current_timestamp,
-    updated_at datetime default current_timestamp,
-    messages text not null -- json array of messages represented as plain string
-);
-```
-
-When a new conversation is started, a new row is inserted into the table with the current timestamp and an empty messages array.
-
-When the conversation finishes, the messages array is updated with the final state of the conversation.
-
-All messages are read and written as one string represented a json array of messages.
-
-The repository interfaces with a `ConversationHistory` dataclass that represents a conversation, enabling (for instance)
-upserting of conversations.
+The schema of the database is stored in schema.sql, which defines two tables:
+- conversation: Stores conversation metadata
+- message: Stores individual messages with sequence ordering
 """
-from contextlib import contextmanager
+
 import json
 import logging
-logger = logging.getLogger('playdo')
 import sqlite3
-from typing import Generator
+from contextlib import contextmanager
+from typing import Generator, List
 
-from playdo.models import ConversationHistory, PlaydoMessage
+from playdo.models import ConversationHistory, PlaydoContent, PlaydoMessage
+
+logger = logging.getLogger("playdo")
+
 
 class ConversationHistoryRepository:
     """
     Manages the conversation history.
     """
+
     def __init__(self, db_path: str):
         self.conn = sqlite3.connect(db_path)
         self.cursor = self.conn.cursor()
+
+    def create_new_conversation(self) -> ConversationHistory:
+        """
+        Create a new conversation. There will be no messages in the conversation initially.
+        """
+        self.cursor.execute("INSERT INTO conversation DEFAULT VALUES")
+        self.conn.commit()
+        conversation_id = self.cursor.lastrowid
+        return self.get_conversation(conversation_id)
+
+    def add_messages_to_conversation(
+        self, conversation_id: int, new_messages: List[PlaydoMessage]
+    ) -> ConversationHistory:
+        """Add new messages to an existing conversation."""
+        # Get the next sequence number
+        self.cursor.execute(
+            "SELECT COALESCE(MAX(sequence_number), -1) + 1 FROM message WHERE conversation_id = ?",
+            (conversation_id,),
+        )
+        next_sequence = self.cursor.fetchone()[0]
+
+        # Insert each new message
+        for i, message in enumerate(new_messages, start=next_sequence):
+            content_json = json.dumps([c.model_dump() for c in message.content])
+            self.cursor.execute(
+                "INSERT INTO message (conversation_id, sequence_number, role, content) VALUES (?, ?, ?, ?)",
+                (conversation_id, i, message.role, content_json),
+            )
+
+        # Update conversation timestamp
+        self.cursor.execute(
+            "UPDATE conversation SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (conversation_id,),
+        )
+        self.conn.commit()
+        return self.get_conversation(conversation_id)
     
-    def upsert_conversation(self, conversation: ConversationHistory) -> ConversationHistory:
-        """
-        Upsert a conversation into the database.
-        """
-        if conversation.id is not None:
-            return self.save_conversation_update(conversation)
-        else:
-            return self.save_new_conversation(conversation)
-
-    def save_new_conversation(self, conversation: ConversationHistory) -> ConversationHistory:
-        """
-        Save a new conversation to the database.
-
-        @param conversation: the conversation to save
-        @return: The new conversation, as loaded from the database
-        """
-        messages_json = json.dumps(conversation.model_dump()['messages'])
-        logger.debug(f"Saving new conversation {messages_json=}")
-        self.cursor.execute("INSERT INTO conversation (messages) VALUES (?)", 
-                            (messages_json,))
-        self.conn.commit()
-        # lastrowid is reliable in the scope of a single connection
-        return self.get_conversation(self.cursor.lastrowid)
-
-    def save_conversation_update(self, conversation: ConversationHistory) -> ConversationHistory:
-        messages_json = json.dumps(conversation.model_dump()['messages'])
-        logger.debug(f"Saving conversation update {messages_json=}")
-        self.cursor.execute("UPDATE conversation SET messages = ? WHERE id = ?", 
-                            (messages_json, conversation.id))
-        self.conn.commit()
-        return self.get_conversation(conversation.id)
-
     def get_conversation(self, id: int) -> ConversationHistory:
-        self.cursor.execute("SELECT * FROM conversation WHERE id = ?", (id,))
-        row = self.cursor.fetchone()
-        if row is None:
+        """Load a conversation and all its messages."""
+        # First verify conversation exists
+        self.cursor.execute(
+            "SELECT created_at, updated_at FROM conversation WHERE id = ?", (id,)
+        )
+        conv_row = self.cursor.fetchone()
+        if conv_row is None:
             raise ValueError(f"Conversation with id {id} not found")
 
-        logger.debug(f"Loaded conversation {row=}")
-        return ConversationHistory(
-            id=row[0],
-            created_at=row[1],
-            updated_at=row[2],
-            messages=[PlaydoMessage.model_validate(message_json) for message_json in json.loads(row[3])]
+        # Get all messages in sequence order
+        self.cursor.execute(
+            "SELECT role, content FROM message WHERE conversation_id = ? ORDER BY sequence_number",
+            (id,),
         )
-    
+        messages = []
+        for role, content_json in self.cursor.fetchall():
+            content_list = [
+                PlaydoContent.model_validate(c) for c in json.loads(content_json)
+            ]
+            messages.append(PlaydoMessage(role=role, content=content_list))
+
+        logger.debug(f"{conv_row=}")
+        created_at = conv_row[0]
+        updated_at = conv_row[1]
+        logger.info(f"{created_at=}, {updated_at=}")
+        return ConversationHistory(
+            id=id, created_at=created_at, updated_at=updated_at, messages=messages
+        )
+
     def get_all_conversation_ids(self) -> list[int]:
         self.cursor.execute("SELECT id FROM conversation")
         return [row[0] for row in self.cursor.fetchall()]
@@ -94,10 +101,11 @@ class ConversationHistoryRepository:
 
 
 @contextmanager
-def conversation_history_manager(db_path: str) -> Generator[ConversationHistoryRepository, None, None]:
+def conversation_history_manager(
+    db_path: str,
+) -> Generator[ConversationHistoryRepository, None, None]:
     try:
         conversation_history = ConversationHistoryRepository(db_path)
         yield conversation_history
     finally:
         conversation_history.cleanup()
-    

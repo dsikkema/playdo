@@ -25,10 +25,17 @@ class ResponseGetter:
         """
         Get the next assistant response. Return the message and the updated list of messages.
 
+        The response_getter object just gets the latest message from Claude. It takes a list of previous messages and
+        returns an updated message list - really the new message list will contain _two new message objects_, one
+        representing the last message from the user (this is the second to last in returned messages), and the last
+        message being the last message from the assistant.
+
         @param prev_messages: list of messages to include in the context
         @param user_query: the user's query
         @return: the assistant's response and the updated list of messages
         """
+        if user_query.strip() == "":
+            raise ValueError("User query is empty")
         user_msg = PlaydoMessage.user_message(user_query)
         logger.debug(f"{prev_messages=}")
         logger.debug(f"User message: {user_msg}")
@@ -43,4 +50,4 @@ class ResponseGetter:
 
         latest_msg = PlaydoMessage.anthropic_message(resp)
         logger.debug(f"Latest message: {latest_msg}")
-        return messages + [latest_msg]
+        return [user_msg, latest_msg]
