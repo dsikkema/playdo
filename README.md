@@ -1,5 +1,23 @@
-# playdo, the chatbot
+# playdo
 A chatbot with great ambitions.
+
+# Installation
+
+```bash
+uv sync
+./install.sh # for now, just loads the database schema
+```
+
+# Usage
+
+```bash
+uv run -m playdo.app
+```
+
+On running, if no conversations have been created yet, you'll drop straight into a new conversation.
+
+If there are existing conversations, you'll be given a list of them from which you can choose one to resume. Previous messages
+will be printed out.
 
 # Current phase:
 
@@ -12,13 +30,6 @@ identifier, which is generated when the conversation starts, and which the user 
 The project is managed with uv. The dependencies are listed in `pyproject.toml` and all project management
 is to be done through native uv commands: `uv sync`, `uv run`, `uv add`, etc. All things `pip` are forbidden.
 
-The chatloop is implemented in `chatloop.py`. It uses the `anthropic` library to interact with Claude.
+The conversation history is saved to a sqlite database in `data/app.db`. The schema of the database is stored in `schema.sql`.
 
-The conversation history is saved to a sqlite database, which is implemented in `conversation_history.py`.
-
-The schema of the database is stored in the following schema initialization file: `schema.sql`.
-
-# Usage
-
-To start a new conversation, run `python chatloop.py`. To resume a conversation, run `python chatloop.py --resume <conversation_id>`.
-
+Models in `playdo.models` are defined using Pydantic, and are pulled to/from the database with a dedicated repository class.
