@@ -3,6 +3,11 @@ A chatbot with great ambitions.
 
 # Installation
 
+required environment variables:
+```bash
+export ANTHROPIC_API_KEY=nicetryhackers
+```
+
 ```bash
 uv sync
 ./install.sh # for now, just loads the database schema
