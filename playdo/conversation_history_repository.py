@@ -87,7 +87,6 @@ class ConversationHistoryRepository:
         logger.debug(f"{conv_row=}")
         created_at = conv_row[0]
         updated_at = conv_row[1]
-        logger.info(f"{created_at=}, {updated_at=}")
         return ConversationHistory(
             id=id, created_at=created_at, updated_at=updated_at, messages=messages
         )

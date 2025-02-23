@@ -19,6 +19,43 @@ uv sync
 uv run -m playdo.app
 ```
 
+```
+ $ uv run -m playdo.app
+Available conversations:
+1
+2
+3
+4
+Enter the number of the conversation to load (or press Enter for new): 
+You're in a brand new conversation: ID=5
+Enter your message (Ctrl-D to finish): 
+Hello, world.
+^D
+Assistant: Hi! How can I help you today?
+
+Enter your message (Ctrl-D to finish): 
+^C
+Input interrupted
+. . . .
+
+ $ uv run -m playdo.app
+Available conversations:
+1
+2
+3
+4
+5
+Enter the number of the conversation to load (or press Enter for new): 5
+Conversation history:
+user: Hello, world.
+
+assistant: Hi! How can I help you today?
+Enter your message (Ctrl-D to finish): 
+Sorry, the line got dropped. Anyway, please list two or three flowers that go nicely with white roses in a bouquet.
+^D
+Assistant: Pink carnations, baby's breath (gypsophila), and purple statice all complement white roses well in bouquets. Baby's breath in particular is a classic pairing with white roses, adding a delicate, airy quality to the arrangement. Pink carnations provide a nice color contrast while maintaining an elegant look, and purple statice adds both color and interesting texture.
+```
+
 On running, if no conversations have been created yet, you'll drop straight into a new conversation.
 
 If there are existing conversations, you'll be given a list of them from which you can choose one to resume. Previous messages
