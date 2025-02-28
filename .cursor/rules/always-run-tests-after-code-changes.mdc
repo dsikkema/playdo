@@ -1,0 +1,15 @@
+---
+description: Rules for running tests after changing python files
+globs: *.py
+alwaysApply: false
+---
+# Run tests
+After ANY substantive code changes to Python files, run tests.
+
+From the `backend` directory, run tests after changes to make sure they still pass.
+
+If already in the backend directory, don't change directories. If not, cd into it:
+```
+cd backend
+uv run pytest
+```
