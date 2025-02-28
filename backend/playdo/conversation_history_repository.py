@@ -35,9 +35,7 @@ class ConversationHistoryRepository:
         conversation_id = self.cursor.lastrowid
         return self.get_conversation(conversation_id)
 
-    def add_messages_to_conversation(
-        self, conversation_id: int, new_messages: List[PlaydoMessage]
-    ) -> ConversationHistory:
+    def add_messages_to_conversation(self, conversation_id: int, new_messages: List[PlaydoMessage]) -> ConversationHistory:
         """Add new messages to an existing conversation."""
         # Get the next sequence number
         self.cursor.execute(
@@ -61,13 +59,11 @@ class ConversationHistoryRepository:
         )
         self.conn.commit()
         return self.get_conversation(conversation_id)
-    
+
     def get_conversation(self, id: int) -> ConversationHistory:
         """Load a conversation and all its messages."""
         # First verify conversation exists
-        self.cursor.execute(
-            "SELECT created_at, updated_at FROM conversation WHERE id = ?", (id,)
-        )
+        self.cursor.execute("SELECT created_at, updated_at FROM conversation WHERE id = ?", (id,))
         conv_row = self.cursor.fetchone()
         if conv_row is None:
             raise ValueError(f"Conversation with id {id} not found")
@@ -79,17 +75,13 @@ class ConversationHistoryRepository:
         )
         messages = []
         for role, content_json in self.cursor.fetchall():
-            content_list = [
-                PlaydoContent.model_validate(c) for c in json.loads(content_json)
-            ]
+            content_list = [PlaydoContent.model_validate(c) for c in json.loads(content_json)]
             messages.append(PlaydoMessage(role=role, content=content_list))
 
         logger.debug(f"{conv_row=}")
         created_at = conv_row[0]
         updated_at = conv_row[1]
-        return ConversationHistory(
-            id=id, created_at=created_at, updated_at=updated_at, messages=messages
-        )
+        return ConversationHistory(id=id, created_at=created_at, updated_at=updated_at, messages=messages)
 
     def get_all_conversation_ids(self) -> list[int]:
         self.cursor.execute("SELECT id FROM conversation")

@@ -19,9 +19,7 @@ class ResponseGetter:
     def __init__(self):
         self.anthropic_client = Anthropic()
 
-    def _get_next_assistant_resp(
-        self, prev_messages: list[PlaydoMessage], user_query: str
-    ) -> list[PlaydoMessage]:
+    def _get_next_assistant_resp(self, prev_messages: list[PlaydoMessage], user_query: str) -> list[PlaydoMessage]:
         """
         Get the next assistant response. Return the message and the updated list of messages.
 

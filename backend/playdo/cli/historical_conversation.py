@@ -11,6 +11,7 @@ Then it enters the chatloop, initialized if needed with previous messages. After
 message exchange, it saves only the new messages to the database.
 
 """
+
 import sys
 from typing import Optional, List
 
@@ -19,7 +20,9 @@ from playdo.response_getter import ResponseGetter
 from playdo.conversation_history_repository import ConversationHistoryRepository
 from playdo.models import ConversationHistory, PlaydoMessage
 import logging
-logger = logging.getLogger('playdo')
+
+logger = logging.getLogger("playdo")
+
 
 class HistoricalConversation:
     def __init__(self, conversation_history: ConversationHistoryRepository, response_getter: ResponseGetter):
@@ -103,13 +106,13 @@ class HistoricalConversation:
             try:
                 # Get updated messages from response getter
                 new_messages = self.response_getter._get_next_assistant_resp(conversation.messages, user_message_str)
-                
+
                 # Save only the new messages
                 conversation = self.conversation_history.add_messages_to_conversation(conversation.id, new_messages)
-                
+
                 # Print the assistant's response (last message)
                 print(f"\nAssistant: {new_messages[-1].content[0].text}\n")
-                
+
             except anthropic.InternalServerError as e:
                 print(f"Error: {e}")
                 continue

@@ -30,6 +30,7 @@ def test_save_new_empty_conversation(repository):
     assert conversation.id is not None
     assert conversation.messages == []
 
+
 def test_add_messages_to_new_conversation(repository):
     """
     Test adding messages to a new conversation: first when it's empty, then when it's initialized with messages.
@@ -49,9 +50,8 @@ def test_add_messages_to_new_conversation(repository):
     ]
     conversation = repository.add_messages_to_conversation(conversation.id, second_new_messages)
     assert len(conversation.messages) == 4
-    assert conversation.messages[:2] == first_new_messages # first two messages are the ones we added earlier
-    assert conversation.messages[-2:] == second_new_messages # last two messages are the ones we added
-
+    assert conversation.messages[:2] == first_new_messages  # first two messages are the ones we added earlier
+    assert conversation.messages[-2:] == second_new_messages  # last two messages are the ones we added
 
 
 def test_get_conversation_success(repository):
@@ -101,10 +101,10 @@ def test_conversation_manager_cleanup(initialized_db):
     Test that the conversation manager properly cleans up resources. Interogates the stubbed connection object
     to verify it was properly closed.
     """
-    with patch('sqlite3.connect') as mock_connect:
+    with patch("sqlite3.connect") as mock_connect:
         mock_connect.return_value = MagicMock()
         with conversation_history_manager(initialized_db):
-            pass 
+            pass
         mock_connect.return_value.close.assert_called_once()
 
 
@@ -130,8 +130,6 @@ def test_conversation_timestamps(repository):
 
     # Add a message and check if updated_at changes
     sleep(1.25)
-    repository.add_messages_to_conversation(conversation.id, [
-        PlaydoMessage.user_message("New message")
-    ])
+    repository.add_messages_to_conversation(conversation.id, [PlaydoMessage.user_message("New message")])
     updated_conversation = repository.get_conversation(conversation.id)
     assert updated_conversation.updated_at > conversation.updated_at
