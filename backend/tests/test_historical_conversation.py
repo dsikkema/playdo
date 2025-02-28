@@ -1,9 +1,11 @@
+from typing import List
+
 from playdo.cli.historical_conversation import HistoricalConversation
-from playdo.models import ConversationHistory, PlaydoMessage
+from playdo.models import ConversationHistory, PlaydoMessage, PlaydoContent
 from unittest.mock import Mock, patch
 
 
-def test_historical_conversation_new_conversation_flow():
+def test_historical_conversation_new_conversation_flow() -> None:
     # Mock dependencies
     mock_conversation_history = Mock()
     mock_response_getter = Mock()
@@ -16,9 +18,9 @@ def test_historical_conversation_new_conversation_flow():
     mock_conversation_history.create_new_conversation.return_value = new_conversation
 
     # Set up mock for adding messages to conversation
-    updated_messages = []
+    updated_messages: List[PlaydoMessage] = []
 
-    def add_messages_side_effect(conversation_id, new_messages):
+    def add_messages_side_effect(conversation_id: int, new_messages: List[PlaydoMessage]) -> ConversationHistory:
         # Simulate adding messages to the conversation
         nonlocal updated_messages
         updated_messages.extend(new_messages)
@@ -28,10 +30,12 @@ def test_historical_conversation_new_conversation_flow():
     mock_conversation_history.add_messages_to_conversation.side_effect = add_messages_side_effect
 
     # Set up mock response getter
-    def get_next_assistant_resp_side_effect(messages, user_input):
+    def get_next_assistant_resp_side_effect(messages: List[PlaydoMessage], user_input: str) -> List[PlaydoMessage]:
         # Create a user message and an assistant response
-        user_message = PlaydoMessage(role="user", content=[{"type": "text", "text": user_input}])
-        assistant_message = PlaydoMessage(role="assistant", content=[{"type": "text", "text": f"Response to: {user_input}"}])
+        user_message = PlaydoMessage(role="user", content=[PlaydoContent(type="text", text=user_input)])
+        assistant_message = PlaydoMessage(
+            role="assistant", content=[PlaydoContent(type="text", text=f"Response to: {user_input}")]
+        )
         return [user_message, assistant_message]
 
     mock_response_getter._get_next_assistant_resp.side_effect = get_next_assistant_resp_side_effect
@@ -93,7 +97,7 @@ def test_historical_conversation_new_conversation_flow():
     assert updated_messages[5].role == "assistant"
 
 
-def test_historical_conversation_load_existing_conversation():
+def test_historical_conversation_load_existing_conversation() -> None:
     # Mock dependencies
     mock_conversation_history = Mock()
     mock_response_getter = Mock()
@@ -103,10 +107,10 @@ def test_historical_conversation_load_existing_conversation():
 
     # Create existing messages for conversation ID 10
     existing_messages = [
-        PlaydoMessage(role="user", content=[{"type": "text", "text": "Previous message 1"}]),
-        PlaydoMessage(role="assistant", content=[{"type": "text", "text": "Previous response 1"}]),
-        PlaydoMessage(role="user", content=[{"type": "text", "text": "Previous message 2"}]),
-        PlaydoMessage(role="assistant", content=[{"type": "text", "text": "Previous response 2"}]),
+        PlaydoMessage(role="user", content=[PlaydoContent(type="text", text="Previous message 1")]),
+        PlaydoMessage(role="assistant", content=[PlaydoContent(type="text", text="Previous response 1")]),
+        PlaydoMessage(role="user", content=[PlaydoContent(type="text", text="Previous message 2")]),
+        PlaydoMessage(role="assistant", content=[PlaydoContent(type="text", text="Previous response 2")]),
     ]
 
     # Create an existing conversation with ID 10
@@ -116,7 +120,7 @@ def test_historical_conversation_load_existing_conversation():
     # Set up mock for adding messages to conversation
     updated_messages = existing_messages.copy()
 
-    def add_messages_side_effect(conversation_id, new_messages):
+    def add_messages_side_effect(conversation_id: int, new_messages: List[PlaydoMessage]) -> ConversationHistory:
         # Simulate adding messages to the conversation
         nonlocal updated_messages
         updated_messages.extend(new_messages)
@@ -129,10 +133,12 @@ def test_historical_conversation_load_existing_conversation():
     mock_conversation_history.add_messages_to_conversation.side_effect = add_messages_side_effect
 
     # Set up mock response getter
-    def get_next_assistant_resp_side_effect(messages, user_input):
+    def get_next_assistant_resp_side_effect(messages: List[PlaydoMessage], user_input: str) -> List[PlaydoMessage]:
         # Create a user message and an assistant response
-        user_message = PlaydoMessage(role="user", content=[{"type": "text", "text": user_input}])
-        assistant_message = PlaydoMessage(role="assistant", content=[{"type": "text", "text": f"Response to: {user_input}"}])
+        user_message = PlaydoMessage(role="user", content=[PlaydoContent(type="text", text=user_input)])
+        assistant_message = PlaydoMessage(
+            role="assistant", content=[PlaydoContent(type="text", text=f"Response to: {user_input}")]
+        )
         return [user_message, assistant_message]
 
     mock_response_getter._get_next_assistant_resp.side_effect = get_next_assistant_resp_side_effect

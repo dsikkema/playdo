@@ -3,9 +3,10 @@ This module powers the "get next message based on previous messages" functionali
 """
 
 import logging
+from typing import List
 
 from anthropic import Anthropic
-from anthropic.types import Message
+from anthropic.types import Message, MessageParam
 
 from playdo.models import PlaydoMessage
 
@@ -15,7 +16,7 @@ MODEL_NAME = "claude-3-5-sonnet-latest"
 
 
 class ResponseGetter:
-    def __init__(self):
+    def __init__(self) -> None:
         self.anthropic_client = Anthropic()
 
     def _get_next_assistant_resp(self, prev_messages: list[PlaydoMessage], user_query: str) -> list[PlaydoMessage]:
@@ -39,10 +40,15 @@ class ResponseGetter:
 
         messages = prev_messages + [user_msg]
 
+        # Convert PlaydoMessage objects to MessageParam objects that Anthropic's API expects
+        message_params: List[MessageParam] = [
+            {"role": msg.role, "content": [{"type": "text", "text": content.text} for content in msg.content]} for msg in messages
+        ]
+
         resp: Message = self.anthropic_client.messages.create(
             model=MODEL_NAME,
             max_tokens=2000,
-            messages=messages,
+            messages=message_params,
         )
 
         latest_msg = PlaydoMessage.anthropic_message(resp)

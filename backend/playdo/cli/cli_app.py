@@ -13,6 +13,6 @@ if __name__ == "__main__":
     logger.addHandler(handler)
     logger.debug("test debug ")
     with conversation_history_manager("data/app.db") as conversation_history:
-        response_getter = ResponseGetter()
+        response_getter: ResponseGetter = ResponseGetter()
         historical_conversation = HistoricalConversation(conversation_history, response_getter)
         historical_conversation.run_historical_conversation()
