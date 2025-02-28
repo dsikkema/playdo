@@ -11,15 +11,18 @@ Then it enters the chatloop, initialized if needed with previous messages. After
 message exchange, it saves only the new messages to the database.
 
 """
+
 import sys
-from typing import Optional, List
+from typing import Optional
 
 import anthropic
 from playdo.response_getter import ResponseGetter
 from playdo.conversation_history_repository import ConversationHistoryRepository
-from playdo.models import ConversationHistory, PlaydoMessage
+from playdo.models import ConversationHistory
 import logging
-logger = logging.getLogger('playdo')
+
+logger = logging.getLogger("playdo")
+
 
 class HistoricalConversation:
     def __init__(self, conversation_history: ConversationHistoryRepository, response_getter: ResponseGetter):
@@ -55,7 +58,7 @@ class HistoricalConversation:
             valid_input_received = True
         return choice
 
-    def run_historical_conversation(self):
+    def run_historical_conversation(self) -> None:
         # get conversation ID from user
         conversation_id = self._prompt_for_conversation_id()
         conversation: Optional[ConversationHistory]
@@ -66,12 +69,14 @@ class HistoricalConversation:
             logger.debug(f"Loaded conversation {conversation=}")
         else:
             logger.debug("No conversation ID provided, starting new conversation")
-            conversation = None
+            conversation = self.conversation_history.create_new_conversation()
+            print(f"You're in a brand new conversation: ID={conversation.id}")
+            logger.debug(f"Created new conversation {conversation=}")
 
         # run the chatloop, passing in the messages
         self._chatloop(conversation)
 
-    def _chatloop(self, conversation: ConversationHistory):
+    def _chatloop(self, conversation: ConversationHistory) -> None:
         """
         Functions by taking all messages from conversation history (which is an empty list if it's a new
         conversation), and passing them into the response_getter, which returns a new message list
@@ -79,10 +84,6 @@ class HistoricalConversation:
 
         After each response, it saves only the new messages to the database.
         """
-        if conversation is None:
-            conversation = self.conversation_history.create_new_conversation()
-            print(f"You're in a brand new conversation: ID={conversation.id}")
-            logger.debug(f"Created new conversation {conversation=}")
 
         if conversation.messages:
             print("Conversation history:")
@@ -103,13 +104,13 @@ class HistoricalConversation:
             try:
                 # Get updated messages from response getter
                 new_messages = self.response_getter._get_next_assistant_resp(conversation.messages, user_message_str)
-                
+
                 # Save only the new messages
                 conversation = self.conversation_history.add_messages_to_conversation(conversation.id, new_messages)
-                
+
                 # Print the assistant's response (last message)
                 print(f"\nAssistant: {new_messages[-1].content[0].text}\n")
-                
+
             except anthropic.InternalServerError as e:
                 print(f"Error: {e}")
                 continue

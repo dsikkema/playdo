@@ -2,6 +2,7 @@
 Models for messages and content blocks, meant to be json-serializable (unlike Anthropic's models)
 and also well-typed (unlike dictionaries).
 """
+
 from typing import Optional, Literal
 from anthropic.types import Message, ContentBlock
 
@@ -9,6 +10,7 @@ from anthropic.types import Message, ContentBlock
 import datetime
 
 from pydantic import BaseModel
+
 
 class PlaydoContent(BaseModel):
     type: Literal["text"]
@@ -31,10 +33,7 @@ class PlaydoMessage(BaseModel):
         """
         return PlaydoMessage(
             role=message.role,
-            content=[
-                PlaydoContent.from_anthropic_content(content)
-                for content in message.content
-            ],
+            content=[PlaydoContent.from_anthropic_content(content) for content in message.content],
         )
 
     @staticmethod
@@ -44,8 +43,9 @@ class PlaydoMessage(BaseModel):
         """
         return PlaydoMessage(role="user", content=[PlaydoContent(type="text", text=query)])
 
+
 class ConversationHistory(BaseModel):
     messages: list[PlaydoMessage]
-    id: Optional[int] = None
+    id: int
     created_at: Optional[datetime.datetime] = None
     updated_at: Optional[datetime.datetime] = None

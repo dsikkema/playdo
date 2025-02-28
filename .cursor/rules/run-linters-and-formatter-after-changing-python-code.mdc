@@ -1,0 +1,12 @@
+---
+description: After changing Python code, ALWAYS run mypy and ruff
+globs: *.py
+alwaysApply: false
+---
+
+# Linters and formatters
+
+If you changed Python code, ALWAYS:
+[ ] If not already in backend directory, cd into `backend`
+[ ] Run typechecker: `uv run mypy .`
+[ ] Run linter/formatter: `uv run ruff check --fix .` and `uv run ruff format .`
