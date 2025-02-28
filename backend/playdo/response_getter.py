@@ -3,10 +3,9 @@ This module powers the "get next message based on previous messages" functionali
 """
 
 import logging
-from typing import Union
 
 from anthropic import Anthropic
-from anthropic.types import Message, MessageParam
+from anthropic.types import Message
 
 from playdo.models import PlaydoMessage
 

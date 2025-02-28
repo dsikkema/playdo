@@ -1,8 +1,6 @@
 from playdo.cli.historical_conversation import HistoricalConversation
 from playdo.models import ConversationHistory, PlaydoMessage
-from unittest.mock import Mock, patch, MagicMock
-import pytest
-from typing import List
+from unittest.mock import Mock, patch
 
 
 def test_historical_conversation_new_conversation_flow():

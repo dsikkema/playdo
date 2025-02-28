@@ -1,8 +1,8 @@
 import sqlite3
 from time import sleep
 import pytest
-from playdo.conversation_history_repository import ConversationHistoryRepository, conversation_history_manager
-from playdo.models import ConversationHistory, PlaydoMessage, PlaydoContent
+from playdo.conversation_history_repository import conversation_history_manager
+from playdo.models import PlaydoMessage, PlaydoContent
 from unittest.mock import MagicMock, patch
 
 

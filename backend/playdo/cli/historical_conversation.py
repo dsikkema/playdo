@@ -13,12 +13,12 @@ message exchange, it saves only the new messages to the database.
 """
 
 import sys
-from typing import Optional, List
+from typing import Optional
 
 import anthropic
 from playdo.response_getter import ResponseGetter
 from playdo.conversation_history_repository import ConversationHistoryRepository
-from playdo.models import ConversationHistory, PlaydoMessage
+from playdo.models import ConversationHistory
 import logging
 
 logger = logging.getLogger("playdo")
