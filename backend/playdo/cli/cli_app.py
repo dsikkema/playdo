@@ -1,6 +1,6 @@
 from playdo.response_getter import ResponseGetter
 from playdo.conversation_history_repository import conversation_history_manager
-from playdo.historical_conversation import HistoricalConversation
+from playdo.cli.historical_conversation import HistoricalConversation
 import logging
 if __name__ == "__main__":
     logger = logging.getLogger('playdo')

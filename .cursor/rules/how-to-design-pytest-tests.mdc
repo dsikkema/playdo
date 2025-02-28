@@ -1,0 +1,54 @@
+---
+description: HOW to write pytest tests, guidance for test design
+globs: test_*.py
+alwaysApply: false
+---
+# Test case designs and scopes
+
+## States to test
+Make sure there are test cases covering the initial state (perhaps reading / writing some entity that's new, or empty) and non-initial states (like reading / writing entities after they've been created and non-empty). When applicable,
+also test when there are zero, or one, or many of something. Use parametrized tests when appropriate to test many combinations of inputs/outputs:
+```
+@pytest.mark.parametrize("a, b, expected", [
+    ([1, 3], [2, 4], [1, 2, 3, 4]),
+    (
+            [], [1, 3], [1, 3]
+    ),
+    (
+            [1, 3], [], [1, 3]
+    ),
+    # ...
+])
+def test_merge(a, b, expected):
+    assert merge(a, b) == expected
+
+```
+
+## Testing database-related components
+For components (like repositories) that explicitly connect to a database directly (such as calling a db sdk or making SqlAlchemy calls), create a live running database fixture to plug into the component, and use the component in a round trip way such as this:
+```
+entity = make_entity()
+repository.save(entity)
+retrieved = respository.get(entity.id)
+assert entity == retrieved # or more narrow comparison, as appropriate
+repository.delete(entity.id)
+assert repository.get(entity.id) is None
+```
+
+## Mocking
+For components that don't directly interface with database SDKs, SqlAlchemy, etc, but only interface with other application components (such as a repository which abstracts away the database interaction), use mocking
+to set up test cases.
+
+Example:
+```
+from unittest.mock import Mock, patch, MagicMock
+
+def test_historical_conversation_new_conversation_flow():
+    # Mock dependencies
+    mock_conversation_history = Mock()
+    mock_response_getter = Mock()
+    
+    # Set up mock conversation history repository
+    mock_conversation_history.get_all_conversation_ids.return_value = []
+    # ... etc
+```

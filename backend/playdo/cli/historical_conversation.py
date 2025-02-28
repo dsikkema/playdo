@@ -92,14 +92,17 @@ class HistoricalConversation:
         while True:
             print("Enter your message (Ctrl-D to finish): ")
             try:
-                user_query = sys.stdin.read()
+                user_message_str = sys.stdin.read()
+                if user_message_str.strip() == "":
+                    print("\nInput cannot be empty!")
+                    continue
             except KeyboardInterrupt:
-                print("\nInput interrupted")
-                user_query = ""
+                print("\nGoodbye!")
+                break
 
             try:
                 # Get updated messages from response getter
-                new_messages = self.response_getter._get_next_assistant_resp(conversation.messages, user_query)
+                new_messages = self.response_getter._get_next_assistant_resp(conversation.messages, user_message_str)
                 
                 # Save only the new messages
                 conversation = self.conversation_history.add_messages_to_conversation(conversation.id, new_messages)
