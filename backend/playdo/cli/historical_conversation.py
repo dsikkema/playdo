@@ -58,7 +58,7 @@ class HistoricalConversation:
             valid_input_received = True
         return choice
 
-    def run_historical_conversation(self):
+    def run_historical_conversation(self) -> None:
         # get conversation ID from user
         conversation_id = self._prompt_for_conversation_id()
         conversation: Optional[ConversationHistory]
@@ -69,12 +69,14 @@ class HistoricalConversation:
             logger.debug(f"Loaded conversation {conversation=}")
         else:
             logger.debug("No conversation ID provided, starting new conversation")
-            conversation = None
+            conversation = self.conversation_history.create_new_conversation()
+            print(f"You're in a brand new conversation: ID={conversation.id}")
+            logger.debug(f"Created new conversation {conversation=}")
 
         # run the chatloop, passing in the messages
         self._chatloop(conversation)
 
-    def _chatloop(self, conversation: ConversationHistory):
+    def _chatloop(self, conversation: ConversationHistory) -> None:
         """
         Functions by taking all messages from conversation history (which is an empty list if it's a new
         conversation), and passing them into the response_getter, which returns a new message list
@@ -82,10 +84,6 @@ class HistoricalConversation:
 
         After each response, it saves only the new messages to the database.
         """
-        if conversation is None:
-            conversation = self.conversation_history.create_new_conversation()
-            print(f"You're in a brand new conversation: ID={conversation.id}")
-            logger.debug(f"Created new conversation {conversation=}")
 
         if conversation.messages:
             print("Conversation history:")

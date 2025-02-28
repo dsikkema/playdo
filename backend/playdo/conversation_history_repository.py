@@ -33,6 +33,7 @@ class ConversationHistoryRepository:
         self.cursor.execute("INSERT INTO conversation DEFAULT VALUES")
         self.conn.commit()
         conversation_id = self.cursor.lastrowid
+        assert conversation_id is not None
         return self.get_conversation(conversation_id)
 
     def add_messages_to_conversation(self, conversation_id: int, new_messages: List[PlaydoMessage]) -> ConversationHistory:

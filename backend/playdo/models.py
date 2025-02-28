@@ -46,6 +46,6 @@ class PlaydoMessage(BaseModel):
 
 class ConversationHistory(BaseModel):
     messages: list[PlaydoMessage]
-    id: Optional[int] = None
+    id: int
     created_at: Optional[datetime.datetime] = None
     updated_at: Optional[datetime.datetime] = None
