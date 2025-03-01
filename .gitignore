@@ -5,11 +5,8 @@ build/
 dist/
 wheels/
 *.egg-info
-
-# Virtual environments
 .venv
-data/
 .envrc
 .vscode/
-.cursorrules
 .scratch/
+backend/data/

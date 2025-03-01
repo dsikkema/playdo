@@ -56,10 +56,10 @@ def send_new_message(conversation_id: int) -> ResponseReturnValue:
         return jsonify({"error": "Missing 'message' field"}), 400
 
     user_message = data["message"]
+    logger.debug(f"User message: {user_message}")
 
     with current_app.conversation_repository() as conv_repository:
         response_getter = ResponseGetter()
-
         try:
             # Get the existing conversation
             conversation = conv_repository.get_conversation(conversation_id)
