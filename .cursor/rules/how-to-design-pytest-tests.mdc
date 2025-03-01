@@ -47,7 +47,7 @@ def test_historical_conversation_new_conversation_flow():
     # Mock dependencies
     mock_conversation_history = Mock()
     mock_response_getter = Mock()
-    
+
     # Set up mock conversation history repository
     mock_conversation_history.get_all_conversation_ids.return_value = []
     # ... etc

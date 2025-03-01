@@ -8,6 +8,7 @@ from typing import List
 from anthropic import Anthropic
 from anthropic.types import Message, MessageParam
 
+from playdo.settings import settings
 from playdo.models import PlaydoMessage
 
 logger = logging.getLogger("playdo")
@@ -38,6 +39,7 @@ class ResponseGetter:
         logger.debug(f"{prev_messages=}")
         logger.debug(f"User message: {user_msg}")
 
+        assert not settings.TESTING, "This function is not mocked in tests"
         messages = prev_messages + [user_msg]
 
         # Convert PlaydoMessage objects to MessageParam objects that Anthropic's API expects

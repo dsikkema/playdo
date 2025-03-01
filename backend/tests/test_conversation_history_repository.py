@@ -1,40 +1,28 @@
-import sqlite3
 from time import sleep
 from pathlib import Path
 from typing import Generator
 
 import pytest
-from playdo.conversation_history_repository import conversation_history_manager, ConversationHistoryRepository
+from playdo.conversation_repository import conversation_repository, ConversationRepository
 from playdo.models import PlaydoMessage, PlaydoContent
 from unittest.mock import MagicMock, patch
 
 
 @pytest.fixture
-def initialized_db(tmp_path: Path) -> str:
-    """Create a temporary database file for testing."""
-    db_path = str(tmp_path / "test.db")
-    with open("schema.sql", "r") as f:
-        schema = f.read()
-    with sqlite3.connect(db_path) as conn:
-        conn.executescript(schema)
-    return db_path
-
-
-@pytest.fixture
-def repository(initialized_db: str) -> Generator[ConversationHistoryRepository, None, None]:
+def repository(initialized_test_db_path: Path) -> Generator[ConversationRepository, None, None]:
     """Create a test repository instance."""
-    with conversation_history_manager(initialized_db) as repo:
+    with conversation_repository(initialized_test_db_path) as repo:
         yield repo
 
 
-def test_save_new_empty_conversation(repository: ConversationHistoryRepository) -> None:
+def test_save_new_empty_conversation(repository: ConversationRepository) -> None:
     """Test creating a new conversation with no messages."""
     conversation = repository.create_new_conversation()
     assert conversation.id is not None
     assert conversation.messages == []
 
 
-def test_add_messages_to_new_conversation(repository: ConversationHistoryRepository) -> None:
+def test_add_messages_to_new_conversation(repository: ConversationRepository) -> None:
     """
     Test adding messages to a new conversation: first when it's empty, then when it's initialized with messages.
     """
@@ -57,7 +45,7 @@ def test_add_messages_to_new_conversation(repository: ConversationHistoryReposit
     assert conversation.messages[-2:] == second_new_messages  # last two messages are the ones we added
 
 
-def test_get_conversation_success(repository: ConversationHistoryRepository) -> None:
+def test_get_conversation_success(repository: ConversationRepository) -> None:
     """Test retrieving an existing conversation, with messages."""
     conversation = repository.create_new_conversation()
     messages = [
@@ -70,7 +58,7 @@ def test_get_conversation_success(repository: ConversationHistoryRepository) -> 
     assert retrieved_conversation.messages == messages
 
 
-def test_get_conversation_empty(repository: ConversationHistoryRepository) -> None:
+def test_get_conversation_empty(repository: ConversationRepository) -> None:
     """Test retrieving an existing conversation, with no messages."""
     conversation = repository.create_new_conversation()
     retrieved_conversation = repository.get_conversation(conversation.id)
@@ -78,18 +66,18 @@ def test_get_conversation_empty(repository: ConversationHistoryRepository) -> No
     assert retrieved_conversation.messages == []
 
 
-def test_get_conversation_not_found(repository: ConversationHistoryRepository) -> None:
+def test_get_conversation_not_found(repository: ConversationRepository) -> None:
     """Test attempting to retrieve a non-existent conversation."""
     with pytest.raises(ValueError, match="Conversation with id .* not found"):
         repository.get_conversation(9999)  # Assuming 9999 is a non-existent ID
 
 
-def test_get_all_conversation_ids_empty(repository: ConversationHistoryRepository) -> None:
+def test_get_all_conversation_ids_empty(repository: ConversationRepository) -> None:
     """Test getting all conversation IDs when database is empty."""
     assert repository.get_all_conversation_ids() == []
 
 
-def test_get_all_conversation_ids_with_data(repository: ConversationHistoryRepository) -> None:
+def test_get_all_conversation_ids_with_data(repository: ConversationRepository) -> None:
     """Test getting all conversation IDs when database has conversations."""
     conversation1 = repository.create_new_conversation()
     conversation2 = repository.create_new_conversation()
@@ -99,19 +87,19 @@ def test_get_all_conversation_ids_with_data(repository: ConversationHistoryRepos
     assert len(ids) == 2
 
 
-def test_conversation_manager_cleanup(initialized_db: str) -> None:
+def test_conversation_manager_cleanup(initialized_test_db_path: Path) -> None:
     """
     Test that the conversation manager properly cleans up resources. Interogates the stubbed connection object
     to verify it was properly closed.
     """
     with patch("sqlite3.connect") as mock_connect:
         mock_connect.return_value = MagicMock()
-        with conversation_history_manager(initialized_db):
+        with conversation_repository(initialized_test_db_path):
             pass
         mock_connect.return_value.close.assert_called_once()
 
 
-def test_message_sequence_ordering(repository: ConversationHistoryRepository) -> None:
+def test_message_sequence_ordering(repository: ConversationRepository) -> None:
     """Test that messages are properly ordered by sequence number."""
     conversation = repository.create_new_conversation()
     messages = [
@@ -124,7 +112,7 @@ def test_message_sequence_ordering(repository: ConversationHistoryRepository) ->
     assert retrieved_conversation.messages[1].content[0].text == "Second message"
 
 
-def test_conversation_timestamps(repository: ConversationHistoryRepository) -> None:
+def test_conversation_timestamps(repository: ConversationRepository) -> None:
     """Test that created_at and updated_at timestamps are properly set."""
     conversation = repository.create_new_conversation()
 

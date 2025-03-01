@@ -121,12 +121,12 @@ backend/playdo/
 ```python
 class Conversation(Base):
     __tablename__ = 'conversations'
-    
+
     id = Column(String, primary_key=True)  # UUID
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     title = Column(String)  # Auto-generated or user-provided
-    
+
     messages = relationship('Message', back_populates='conversation')
 ```
 
@@ -134,13 +134,13 @@ class Conversation(Base):
 ```python
 class Message(Base):
     __tablename__ = 'messages'
-    
+
     id = Column(String, primary_key=True)  # UUID
     conversation_id = Column(String, ForeignKey('conversations.id'))
     role = Column(String)  # 'user', 'assistant', or 'system'
     content = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
-    
+
     conversation = relationship('Conversation', back_populates='messages')
 ```
 
@@ -148,7 +148,7 @@ class Message(Base):
 ```python
 class CodeSnippet(Base):
     __tablename__ = 'code_snippets'
-    
+
     id = Column(String, primary_key=True)  # UUID
     conversation_id = Column(String, ForeignKey('conversations.id'))
     code = Column(Text)

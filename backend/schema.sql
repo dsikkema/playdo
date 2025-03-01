@@ -14,4 +14,3 @@ create table message (
     foreign key (conversation_id) references conversation(id),
     unique(conversation_id, sequence_number)  -- Ensures ordering integrity
 );
-

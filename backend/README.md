@@ -26,14 +26,14 @@ Available conversations:
 2
 3
 4
-Enter the number of the conversation to load (or press Enter for new): 
+Enter the number of the conversation to load (or press Enter for new):
 You're in a brand new conversation: ID=5
-Enter your message (Ctrl-D to finish): 
+Enter your message (Ctrl-D to finish):
 Hello, world.
 ^D
 Assistant: Hi! How can I help you today?
 
-Enter your message (Ctrl-D to finish): 
+Enter your message (Ctrl-D to finish):
 ^C
 Input interrupted
 . . . .
@@ -50,7 +50,7 @@ Conversation history:
 user: Hello, world.
 
 assistant: Hi! How can I help you today?
-Enter your message (Ctrl-D to finish): 
+Enter your message (Ctrl-D to finish):
 Sorry, the line got dropped. Anyway, please list two or three flowers that go nicely with white roses in a bouquet.
 ^D
 Assistant: Pink carnations, baby's breath (gypsophila), and purple statice all complement white roses well in bouquets. Baby's breath in particular is a classic pairing with white roses, adding a delicate, airy quality to the arrangement. Pink carnations provide a nice color contrast while maintaining an elegant look, and purple statice adds both color and interesting texture.
@@ -63,7 +63,7 @@ will be printed out.
 
 # Current phase:
 
-The current phase of this project is to build a chatloop that allows me to speak with Claude, and save the conversation history to a 
+The current phase of this project is to build a chatloop that allows me to speak with Claude, and save the conversation history to a
 sqlite database, from which conversation history can be retrieved and easily reconstructed. Conversations are indexed by a unique
 identifier, which is generated when the conversation starts, and which the user may provide later to resume the conversation.
 
