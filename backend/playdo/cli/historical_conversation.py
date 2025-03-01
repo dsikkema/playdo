@@ -17,7 +17,7 @@ from typing import Optional
 
 import anthropic
 from playdo.response_getter import ResponseGetter
-from playdo.conversation_history_repository import ConversationHistoryRepository
+from playdo.conversation_repository import ConversationRepository
 from playdo.models import ConversationHistory
 import logging
 
@@ -25,7 +25,7 @@ logger = logging.getLogger("playdo")
 
 
 class HistoricalConversation:
-    def __init__(self, conversation_history: ConversationHistoryRepository, response_getter: ResponseGetter):
+    def __init__(self, conversation_history: ConversationRepository, response_getter: ResponseGetter):
         self.conversation_history = conversation_history
         self.response_getter = response_getter
 

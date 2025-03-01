@@ -11,19 +11,19 @@ import logging
 import sqlite3
 from contextlib import contextmanager
 from typing import Generator, List
-
+from pathlib import Path
 from playdo.models import ConversationHistory, PlaydoContent, PlaydoMessage
 
 logger = logging.getLogger("playdo")
 
 
-class ConversationHistoryRepository:
+class ConversationRepository:
     """
     Manages the conversation history.
     """
 
-    def __init__(self, db_path: str):
-        self.conn = sqlite3.connect(db_path)
+    def __init__(self, db_path: Path):
+        self.conn = sqlite3.connect(str(db_path))
         self.cursor = self.conn.cursor()
 
     def create_new_conversation(self) -> ConversationHistory:
@@ -37,7 +37,10 @@ class ConversationHistoryRepository:
         return self.get_conversation(conversation_id)
 
     def add_messages_to_conversation(self, conversation_id: int, new_messages: List[PlaydoMessage]) -> ConversationHistory:
-        """Add new messages to an existing conversation."""
+        """
+        Add new messages to an existing conversation.
+        TOODO: transactional safety. database race condition here.
+        """
         # Get the next sequence number
         self.cursor.execute(
             "SELECT COALESCE(MAX(sequence_number), -1) + 1 FROM message WHERE conversation_id = ?",
@@ -93,11 +96,11 @@ class ConversationHistoryRepository:
 
 
 @contextmanager
-def conversation_history_manager(
-    db_path: str,
-) -> Generator[ConversationHistoryRepository, None, None]:
+def conversation_repository(
+    db_path: Path,
+) -> Generator[ConversationRepository, None, None]:
     try:
-        conversation_history = ConversationHistoryRepository(db_path)
-        yield conversation_history
+        conversation_repository = ConversationRepository(db_path)
+        yield conversation_repository
     finally:
-        conversation_history.cleanup()
+        conversation_repository.cleanup()
