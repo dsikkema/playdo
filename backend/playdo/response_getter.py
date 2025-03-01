@@ -12,8 +12,6 @@ from playdo.settings import settings
 from playdo.models import PlaydoMessage
 
 logger = logging.getLogger("playdo")
-MODEL_NAME = "claude-3-5-sonnet-latest"
-# MODEL_NAME = "claude-3-5-haiku-latest"
 
 
 class ResponseGetter:
@@ -48,7 +46,7 @@ class ResponseGetter:
         ]
 
         resp: Message = self.anthropic_client.messages.create(
-            model=MODEL_NAME,
+            model=settings.ANTHROPIC_MODEL,
             max_tokens=2000,
             messages=message_params,
         )

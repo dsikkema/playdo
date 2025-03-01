@@ -13,6 +13,7 @@ class Settings:
     BACKEND_BASE_DIR = Path(__file__).parent.parent
     DEBUG = os.getenv("PLAYDO_DEBUG").lower() == "true"
     TESTING = False
+    ANTHROPIC_MODEL = os.getenv("PLAYDO_ANTHROPIC_MODEL")
 
 
 settings = Settings()
