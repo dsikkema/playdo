@@ -18,7 +18,6 @@ Coming Soon:
 
 ## Backend API
 toodo write dedicated readme
-tldr;
 ```bash
 export PLAYDO_DATABASE_PATH='data/playdo.db'
 export PLAYDO_DEBUG='true'
@@ -35,5 +34,4 @@ See scripts in `backend/curls` for examples of how to use the api.
 
 ## Frontend
 
-(Nothing but a template so far)
 [frontend/README.md](frontend/README.md)

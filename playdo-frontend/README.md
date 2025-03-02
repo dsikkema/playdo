@@ -1,12 +1,13 @@
-![reactjs-vite-tailwindcss-boilerplate](https://user-images.githubusercontent.com/16243531/217138979-b854309c-4742-4275-a705-f9fec5158217.jpg)
+# PlayDo Frontend
 
-# React Tailwindcss Boilerplate build with Vite
+## Directory
+Note: This app is under the `playdo-frontend/` directory of the playdo project, all commands must be run from this
+directory.
 
-This is a boilerplate build with Vite, React 18, TypeScript, Vitest, Testing Library, TailwindCSS 3, Eslint and Prettier.
+## Tech Stack
+Started from a template: https://github.com/joaopaulomoraes/reactjs-vite-tailwindcss-boilerplate
 
-## What is inside?
-
-This project uses many tools like:
+Built with Vite, React 18, TypeScript, Vitest, Testing Library, TailwindCSS 3, Eslint and Prettier
 
 - [Vite](https://vitejs.dev)
 - [ReactJS](https://reactjs.org)
@@ -17,64 +18,88 @@ This project uses many tools like:
 - [Eslint](https://eslint.org)
 - [Prettier](https://prettier.io)
 
-## Getting Started
+## Architecture
 
-### Install
+The application follows a component-based architecture with clear separation of concerns:
 
-Create the project.
+- **Types**: Strongly typed data structures used throughout the application
+- **API Services**: Functions for interacting with backend APIs
+- **Components**: Reusable UI components for rendering the application
 
-```bash
-pnpm dlx degit joaopaulomoraes/reactjs-vite-tailwindcss-boilerplate my-app
-```
+Key components:
+- `App`: Main application component, manages conversation selection state
+- `ConversationView`: Displays messages from the selected conversation
+- `Message`: Renders individual messages with appropriate styling
 
-Access the project directory.
+### Prerequisites
 
-```bash
-cd my-app
-```
+- Node.js 18 or higher
+- npm 10 or higher (idk, that's what I have)
 
-Install dependencies.
-
-```bash
-pnpm install
-```
-
-Serve with hot reload at <http://localhost:5173>.
+### Installation
 
 ```bash
-pnpm run dev
+npm install
 ```
 
-### Lint
+### Development
 
+Start the development server with hot reloading:
 ```bash
-pnpm run lint
+npm run dev
 ```
 
-### Typecheck
+The application will be available at http://localhost:5173.
 
+### Testing
+
+Run all tests:
 ```bash
-pnpm run typecheck
+npm run test
 ```
 
-### Build
-
+View and interact with tests via UI:
 ```bash
-pnpm run build
+npm run test:ui
 ```
 
-### Test
+### Linting and Type Checking
 
+Check for linting issues:
 ```bash
-pnpm run test
+npm run lint
 ```
 
-View and interact with your tests via UI.
-
+Check for TypeScript errors:
 ```bash
-pnpm run test:ui
+npm run typecheck
 ```
+
+## Project Structure
+
+```
+src/
+├── assets/
+├── components/
+│   ├── App.tsx
+│   ├── ConversationView.tsx
+│   ├── ... (etc)
+│   └── Message.tsx
+├── services/
+│   └── api.ts
+├── types/
+│   └── index.ts
+└── utils/
+    └── index.ts
+```
+
+## Important Notes for Development
+
+- The application uses the React hooks pattern extensively (useState, useEffect)
+- Components are designed to be stateless where possible, with state management handled by parent components
+- Error states, loading states, and empty states are handled for all data fetching
+- TailwindCSS is used for styling - refer to the TailwindCSS documentation for class names
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License - see the LICENSE file for details.
