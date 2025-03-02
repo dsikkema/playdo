@@ -5,9 +5,39 @@ repos:
     - id: check-yaml
     - id: end-of-file-fixer
     - id: trailing-whitespace
+- repo: https://github.com/pre-commit/mirrors-mypy
+  rev: v1.15.0
+  hooks:
+    -   id: mypy
 - repo: https://github.com/astral-sh/ruff-pre-commit
   rev: v0.9.9
   hooks:
     - id: ruff
       args: ["--fix"]
     - id: ruff-format
+- repo: local
+  hooks:
+    - id: frontend-lint
+      name: Frontend Linting
+      entry: bash -c 'cd playdo-frontend && npm run lint'
+      language: system
+      pass_filenames: false
+      files: ^playdo-frontend/
+    - id: frontend-typecheck
+      name: Frontend Type Checking
+      entry: bash -c 'cd playdo-frontend && npm run typecheck'
+      language: system
+      pass_filenames: false
+      files: ^playdo-frontend/
+    - id: frontend-test
+      name: Frontend Tests
+      entry: bash -c 'cd playdo-frontend && npm run test'
+      language: system
+      pass_filenames: false
+      files: ^playdo-frontend/
+    - id: backend-test
+      name: Backend Tests
+      entry: bash -c 'cd backend && uv run pytest'
+      language: system
+      pass_filenames: false
+      files: ^backend/
