@@ -5,7 +5,11 @@ import { Conversation  } from '../types';
 import { fetchConversation } from '../services/api';
 import Message from './Message';
 
-function ConversationView() {
+export type ConversationViewProps = {
+  conversationId: number | null;
+}
+
+function ConversationView({conversationId}: ConversationViewProps) {
   // State to store the conversation data
   const [conversation, setConversation] = useState<Conversation | null>(null);
   // State to track loading status
@@ -13,12 +17,21 @@ function ConversationView() {
   // State to track any errors
   const [error, setError] = useState<string | null>(null);
 
+
   // Effect to fetch the conversation when the component mounts
   useEffect(() => {
+    // reset error/conversation state before reloading
+    setError(null);
+    setConversation(null);
+
     async function loadConversation() {
+      if (conversationId == null) {
+        return;
+      }
+
       try {
         setLoading(true);
-        const data = await fetchConversation(1); // hard-codes conversationID=1, TOODO select
+        const data = await fetchConversation(conversationId);
         setConversation(data);
         setError(null);
       } catch (err) {
@@ -30,7 +43,11 @@ function ConversationView() {
     }
 
     loadConversation();
-  }, []); // Empty dependency array means this runs once on mount
+  }, [conversationId]); // Update component every time passed in conversationID changes
+
+  if (conversationId == null) {
+    return <div className="py-8">Please select a conversation from the list.</div>;
+  }
 
   // Show loading state
   if (loading) {

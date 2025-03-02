@@ -17,3 +17,7 @@ export type Conversation = {
   messages: Message[];
   updated_at: string;
 };
+
+export type ConversationListResponse = {
+  conversation_ids: number[];
+};
