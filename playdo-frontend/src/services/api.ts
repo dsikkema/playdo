@@ -5,7 +5,7 @@ import { Conversation } from '../types';
 // For now, hardcoded to fetch conversation with ID 6
 export async function fetchConversation(id: number): Promise<Conversation> {
   try {
-    const response = await fetch(`http://localhost:5000/api/conversations/${id}`);
+    const response = await fetch(`https://playdo.sikkema.duckdns.org:5000/api/conversations/${id}`);
 
     if (!response.ok) {
       throw new Error(`API error: ${response.status}`);
@@ -21,7 +21,7 @@ export async function fetchConversation(id: number): Promise<Conversation> {
 
 export async function fetchConversationIds(): Promise<number[]> {
     try {
-      const response = await fetch('http://localhost:5000/api/conversations');
+      const response = await fetch('https://playdo.sikkema.duckdns.org:5000/api/conversations');
 
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
