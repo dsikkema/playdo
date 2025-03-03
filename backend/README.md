@@ -13,10 +13,10 @@ uv sync
 ./install.sh # for now, just loads the database schema
 ```
 
-# Usage
+# CLI Usage
 
 ```bash
-uv run -m playdo.app
+uv run -m playdo.cli.cli_app
 ```
 
 ```
