@@ -7,6 +7,6 @@ alwaysApply: false
 # Linters and formatters
 
 If you changed Python code, ALWAYS:
-[ ] If not already in backend directory, cd into `backend`
 [ ] Run typechecker: `uv run mypy .`
 [ ] Run linter/formatter: `uv run ruff check --fix .` and `uv run ruff format .`
+[ ] As mentioned by other rules, still also run tests: `uv run pytest`

@@ -6,6 +6,6 @@ alwaysApply: false
 # Python Tests
 
 ## When to write new tests, new test cases, or update existing test cases
-When add substantive features, fixing bugs, or making substantive changes, write automated tests with PyTest that logically covers the change. Run tests to verify they pass using `uv run pytest`.
+When adding features, fixing bugs, or making any changes, write automated tests with PyTest that logically covers the change. Run tests to verify they pass using `uv run pytest`.
 
 A bug is not fixed until a test prove that it's fixed, that would have failed without fixing the bug.

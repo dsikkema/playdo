@@ -4,12 +4,4 @@ globs: *.py
 alwaysApply: false
 ---
 # Run tests
-After ANY code changes to a set Python files, run tests.
-
-From the `backend` directory, run tests after changes to make sure they still pass.
-
-If already in the backend directory, don't change directories. If not, cd into it:
-```
-cd backend
-uv run pytest
-```
+After ANY code changes to a set Python files, run tests, using `uv run pytest`
