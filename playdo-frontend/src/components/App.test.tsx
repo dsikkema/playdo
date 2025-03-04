@@ -18,14 +18,19 @@ vi.mock('./ConversationSelector', () => ({
   }) => (
     <div data-testid="conversation-selector">
       {/**
-       * Claude says the following:
-       * About the button - this is a simplification for testing purposes. The real component might have a dropdown select, but for testing,
-       * all we need is a way to trigger the onSelectConversation function. A button with a click handler is an easy way to do this in tests.
-       * The data-testid attributes are special markers added to elements solely for testing purposes. They make it easy to find elements in
-       * tests without relying on text content or CSS selectors that might change. This approach isn't buggy or misleading - it's a common
-       * testing pattern called "component mocking" where you replace complex child components with simpler versions that provide the same
-       * interface but with minimal implementation. The test is focused on how App interacts with its children, not on the internal workings
-       * of those children.
+       * Note: replaces the html content implementation of the real ConversationSelector, because we don't need or care about those implementation
+       * details. We only need something in the test component so that we can hook into it and cause the 'onSelectConversation' callback to be
+       * called. This is because of the way that the parent and child components interrelate to one another - the child can run the parent's
+       * code by means of callbacks.
+       *
+       * For instance, in one of the tests below, we see:
+       * ```
+       *     await user.click(screen.getByTestId('select-conversation-button'))
+       * ```
+       * Which is the test's way of causing the child to run the callback, by clicking the button that's wired up to the callback.
+       *
+       * The key idea is this test only cares about the way in which the parent interacts with the children, not on the internal
+       * workings of the children.
        */}
       <button
         onClick={() => onSelectConversation(1)}
@@ -72,6 +77,9 @@ describe('<App />', () => {
     await user.click(screen.getByTestId('select-conversation-button'))
 
     // Assert
+    // Note: assertion is based on the text supplied in the mocked child component.
+    // Again, just testing the proper parent-child interaction, that the mock was
+    // given the appropriate value and hence rendering the appropriate state.
     expect(screen.getByText('Viewing conversation 1')).toBeInTheDocument()
     expect(screen.getByTestId('selected-id').textContent).toBe('1')
   })
