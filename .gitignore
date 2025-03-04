@@ -9,4 +9,4 @@ wheels/
 .envrc
 .vscode/
 .scratch/
-backend/data/
+data/
