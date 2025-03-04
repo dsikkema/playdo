@@ -1,3 +1,4 @@
+from pathlib import Path
 from playdo.settings import settings
 from playdo.response_getter import ResponseGetter
 from playdo.conversation_repository import conversation_repository
@@ -12,7 +13,7 @@ if __name__ == "__main__":
     formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-    with conversation_repository(settings.DATABASE_PATH) as conversation_history:
+    with conversation_repository(Path(settings.DATABASE_PATH)) as conversation_history:
         response_getter: ResponseGetter = ResponseGetter()
         historical_conversation = HistoricalConversation(conversation_history, response_getter)
         historical_conversation.run_historical_conversation()

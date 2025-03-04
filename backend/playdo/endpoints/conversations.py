@@ -3,6 +3,7 @@ TOODO:
  - proper response types
 """
 
+from typing import cast
 import logging
 from flask import Blueprint, jsonify, request, current_app
 from flask.typing import ResponseReturnValue
@@ -15,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 conversations_bp = Blueprint("conversations", __name__)
 
-current_app: PlaydoApp  # typing enables jump-to-definition
+current_app = cast(PlaydoApp, current_app)  # typing enables jump-to-definition
 
 
 @conversations_bp.route("/conversations", methods=["GET"])

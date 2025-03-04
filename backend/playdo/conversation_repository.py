@@ -23,6 +23,7 @@ class ConversationRepository:
     """
 
     def __init__(self, db_path: Path):
+        assert db_path.exists(), f"Database file {db_path} does not exist"
         self.conn = sqlite3.connect(str(db_path))
         self.cursor = self.conn.cursor()
 

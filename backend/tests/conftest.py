@@ -25,7 +25,7 @@ def test_app(initialized_test_db_path: Path) -> Generator[PlaydoApp, None, None]
     """
     Create and configure a Flask app for testing using built-in fixture for temp files.
     """
-    app = create_app(database_path=initialized_test_db_path, testing=True)
+    app = create_app(database_path=str(initialized_test_db_path), testing=True)
 
     yield app
 
