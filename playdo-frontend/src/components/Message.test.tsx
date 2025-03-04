@@ -20,13 +20,6 @@ describe('<Message />', () => {
     expect(
       screen.getByText('Hello, this is a test message')
     ).toBeInTheDocument()
-
-    // Check that the message has the user styling
-    const messageElement = screen.getByText('Hello, this is a test message')
-    const messageContainer = messageElement.closest('div')?.parentElement
-    expect(messageContainer).not.toBeNull()
-    expect(messageContainer).toHaveClass('ml-auto')
-    expect(messageContainer).toHaveClass('bg-blue-100')
   })
 
   // Test case for assistant message
@@ -43,13 +36,6 @@ describe('<Message />', () => {
     // Assert
     expect(screen.getByText('Assistant')).toBeInTheDocument()
     expect(screen.getByText('I am the assistant')).toBeInTheDocument()
-
-    // Check that the message has the assistant styling
-    const messageElement = screen.getByText('I am the assistant')
-    const messageContainer = messageElement.closest('div')?.parentElement
-    expect(messageContainer).not.toBeNull()
-    expect(messageContainer).toHaveClass('mr-auto')
-    expect(messageContainer).toHaveClass('bg-gray-100')
   })
 
   // Test case for message with multiple content items

@@ -4,12 +4,28 @@ import ConversationView from './ConversationView'
 import { fetchConversation } from '../services/api'
 import { Conversation } from '../types'
 
-// Mock the API module
+/**
+ * Mock the API module
+ *
+ * Note: Use vi.mock() to mock whole module, mean vitest replaces all exported functions with the mock functions defined
+ * in below object.
+ */
 vi.mock('../services/api', () => ({
   fetchConversation: vi.fn()
 }))
 
-// Mock implementation of fetchConversation
+/**
+ * Mock implementation of fetchConversation
+ *
+ * Note: fetchConversation, because it's imported, even though it's been mocked, TypeScript still 'thinks' it's the
+ * original type.
+ *
+ * `as unknown` is the first type 'conversion'. Converts the real type into 'unknown', a special 'any value' kind of
+ * type. This erases original type.
+ *
+ * `as ReturnType<typeof vi.fn>` - ReturnType<T> extracts a return type from a function type, so it sets the type now
+ * as 'the same as whatever vi.fn returns'. This type has the methods like mockReturnValue, mockResolvedValue, etc.
+ */
 const mockFetchConversation = fetchConversation as unknown as ReturnType<
   typeof vi.fn
 >
@@ -38,30 +54,43 @@ describe('<ConversationView />', () => {
     // Create a promise that won't resolve immediately to keep the component in loading state
     const fetchPromise = new Promise<Conversation>(() => {})
     mockFetchConversation.mockReturnValue(fetchPromise)
+    const conversationId = 1
 
     // Act
-    render(<ConversationView conversationId={1} />)
+    render(<ConversationView conversationId={conversationId} />)
 
     // Assert
     expect(screen.getByText('Loading conversation...')).toBeInTheDocument()
-    expect(mockFetchConversation).toHaveBeenCalledWith(1)
+    expect(mockFetchConversation).toHaveBeenCalledWith(conversationId)
   })
 
   // Test case for error state
   it('shows error message when API call fails', async () => {
     // Arrange
+    // Note: similar to mockResolvedValue, it mocks the error thrown inside promise
     mockFetchConversation.mockRejectedValue(new Error('API error'))
+    const conversationId = 1
 
     // Act
-    render(<ConversationView conversationId={1} />)
+    render(<ConversationView conversationId={conversationId} />)
 
     // Assert
+
+    /**
+     * Note: waitFor() happens because, at first render, there is (or may be) a different state than the one expected.
+     * We use hooks related to useState and useEffect to enact re-renders. So, at first, the component may be in the
+     * "loading" state, and only after some computation and rerenders happen will the component finish being rendered
+     * into the "error state". waitFor() will repeatedly run the provided callback function provided (which performs
+     * the assertions) either until they pass, or until a timeout (which would fail the test)
+     *
+     * This also applies to waitFor() in the tests that successfully render the cases of no/one/many messages.
+     */
     await waitFor(() => {
       expect(
         screen.getByText('Failed to load conversation. Please try again later.')
       ).toBeInTheDocument()
     })
-    expect(mockFetchConversation).toHaveBeenCalledWith(1)
+    expect(mockFetchConversation).toHaveBeenCalledWith(conversationId)
   })
 
   // Test case for empty conversation
@@ -73,16 +102,18 @@ describe('<ConversationView />', () => {
       updated_at: '2023-01-01T00:00:00Z',
       messages: []
     }
+    // Note: different from mockReturnValue - it cuts through the async/Promise layer, mocking what the promise returns
     mockFetchConversation.mockResolvedValue(emptyConversation)
+    const conversationId = 1
 
     // Act
-    render(<ConversationView conversationId={1} />)
+    render(<ConversationView conversationId={conversationId} />)
 
     // Assert
     await waitFor(() => {
       expect(screen.getByText('No messages found.')).toBeInTheDocument()
     })
-    expect(mockFetchConversation).toHaveBeenCalledWith(1)
+    expect(mockFetchConversation).toHaveBeenCalledWith(conversationId)
   })
 
   // Test case for conversation with a single message
@@ -102,7 +133,8 @@ describe('<ConversationView />', () => {
     mockFetchConversation.mockResolvedValue(singleMessageConversation)
 
     // Act
-    render(<ConversationView conversationId={1} />)
+    const conversationId = 1
+    render(<ConversationView conversationId={conversationId} />)
 
     // Assert
     await waitFor(() => {
@@ -110,7 +142,7 @@ describe('<ConversationView />', () => {
       expect(screen.getByText('You')).toBeInTheDocument()
       expect(screen.getByText('This is a single message')).toBeInTheDocument()
     })
-    expect(mockFetchConversation).toHaveBeenCalledWith(1)
+    expect(mockFetchConversation).toHaveBeenCalledWith(conversationId)
   })
 
   // Test case for conversation with multiple messages
@@ -138,7 +170,8 @@ describe('<ConversationView />', () => {
     mockFetchConversation.mockResolvedValue(multipleMessagesConversation)
 
     // Act
-    render(<ConversationView conversationId={2} />)
+    const conversationId = 2
+    render(<ConversationView conversationId={conversationId} />)
 
     // Assert
     await waitFor(() => {
@@ -151,6 +184,6 @@ describe('<ConversationView />', () => {
       ).toBeInTheDocument()
       expect(screen.getByText('That is good to hear.')).toBeInTheDocument()
     })
-    expect(mockFetchConversation).toHaveBeenCalledWith(2)
+    expect(mockFetchConversation).toHaveBeenCalledWith(conversationId)
   })
 })

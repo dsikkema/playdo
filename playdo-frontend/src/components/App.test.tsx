@@ -3,11 +3,9 @@ import { describe, it, expect, vi } from 'vitest'
 import userEvent from '@testing-library/user-event'
 import App from './App'
 
-// Mock the API module
-vi.mock('../services/api', () => ({
-  fetchConversationIds: vi.fn(),
-  fetchConversation: vi.fn()
-}))
+// Note: deleted previous implementation that mocked api out, because App doesn't directly use api,
+// and children components that _do_ use it are mocked in this test, and this fact helps demonstrate
+// the value of mocking out those child components entirely.
 
 // Mock the child components
 vi.mock('./ConversationSelector', () => ({
