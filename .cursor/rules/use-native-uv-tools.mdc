@@ -1,6 +1,6 @@
 ---
 description: UV-native tooling only
-globs: *.py
+globs: *.py,pyproject.toml
 alwaysApply: false
 ---
 # Use uv-native tooling

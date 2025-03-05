@@ -31,5 +31,10 @@ def create_app(database_path: Optional[str] = None, testing: bool = False) -> Pl
 
 app = create_app()
 
+
+def main():
+    app.run(debug=settings.DEBUG, host="0.0.0.0")
+
+
 if __name__ == "__main__":
-    app.run(debug=settings.DEBUG)
+    main()
