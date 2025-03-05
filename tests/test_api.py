@@ -79,16 +79,16 @@ def test_send_message(client: FlaskClient, mock_response_getter: MagicMock) -> N
     conversation_id = create_conv_data["id"]
 
     # Then add a message
-    message_response = client.post(
+    conversation_response = client.post(
         f"/api/conversations/{conversation_id}/send_message", json={"message": "Hello"}, content_type="application/json"
     )
-    assert message_response.status_code == 200
-    message_data = json.loads(message_response.data)
-    assert "conversation" in message_data
-    assert "messages" in message_data["conversation"]
-    assert len(message_data["conversation"]["messages"]) == 2
-    assert message_data["conversation"]["messages"][0]["role"] == "user"
-    assert message_data["conversation"]["messages"][1]["role"] == "assistant"
+    assert conversation_response.status_code == 200
+    conversation_data = json.loads(conversation_response.data)
+    assert "messages" in conversation_data
+    assert "id" in conversation_data
+    assert len(conversation_data["messages"]) == 2
+    assert conversation_data["messages"][0]["role"] == "user"
+    assert conversation_data["messages"][1]["role"] == "assistant"
 
 
 def test_add_message_invalid_json(client: FlaskClient) -> None:

@@ -1,6 +1,7 @@
 """
 TOODO:
  - proper response types
+ - autogenerate OpenAPI schema
 """
 
 from typing import cast
@@ -73,7 +74,7 @@ def send_new_message(conversation_id: int) -> ResponseReturnValue:
             updated_conversation = conv_repository.add_messages_to_conversation(conversation_id, new_messages)
             logger.debug(f"Updated conversation: {updated_conversation.model_dump()}")
             # Return the updated conversation with the new messages
-            return jsonify({"conversation": updated_conversation.model_dump()})
+            return jsonify(updated_conversation.model_dump())
         except ValueError as e:
             logger.exception(e)
             return jsonify({"error": f"Conversation with id {conversation_id} not found"}), 404

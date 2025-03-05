@@ -33,4 +33,14 @@ cd backend
 uv run -m playdo.app
 ```
 
+For more quick sanity testing:
+```bash
+./run.sh
+```
+
+If already running:
+```bash
+./sanity_test.py # run a couple GET requests on different endpoints, assert successful and non-empty responses
+```
+
 See scripts in `curls/` for examples of how to use the api.
