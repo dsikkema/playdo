@@ -1,7 +1,7 @@
 ---
-description: HOW to write pytest tests, guidance for test design
+description: HOW to write pytest tests
 globs: test_*.py
-alwaysApply: false
+alwaysApply: true
 ---
 # Test case designs and scopes
 

@@ -1,3 +1,4 @@
+#!uv run
 """
 Just do two basic requests to verify successful, non-empty responses
 """

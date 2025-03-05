@@ -1,10 +1,10 @@
 ---
-description: After changing Python code, ALWAYS run mypy and ruff
+description: ALWAYS run mypy and ruff: MANDATORY
 globs: *.py
-alwaysApply: false
+alwaysApply: true
 ---
 
-# Linters and formatters
+# MANDATORY code quality verification
 
 If you changed Python code, ALWAYS:
 [ ] Run typechecker: `uv run mypy .`
