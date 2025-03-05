@@ -1,7 +1,7 @@
 ---
 description: Run tests after changing ANY Python code ALWAYS
 globs: *.py
-alwaysApply: false
+alwaysApply: true
 ---
 # Run tests
 After ANY code changes to a set Python files, run tests, using `uv run pytest`

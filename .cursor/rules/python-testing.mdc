@@ -1,5 +1,5 @@
 ---
-description: When to write PyTest tests for Python files
+description: ALWAYS write PyTest tests: MANDATORY
 globs: *.py
 alwaysApply: false
 ---

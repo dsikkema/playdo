@@ -1,7 +1,7 @@
 ---
 description: When writing python functions use typehints
 globs: *.py
-alwaysApply: false
+alwaysApply: true
 ---
 
 # Always use typehints for python functions
