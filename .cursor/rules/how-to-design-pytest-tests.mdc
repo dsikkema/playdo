@@ -52,3 +52,7 @@ def test_historical_conversation_new_conversation_flow():
     mock_conversation_history.get_all_conversation_ids.return_value = []
     # ... etc
 ```
+
+## Simplicity
+Do NOT write complicated tests that have excessive assertions or mock things in too sophisticated a manner. Tests must be simple, their assertions MUST be the minimum
+essentials that capture quality.
