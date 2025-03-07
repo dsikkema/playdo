@@ -72,12 +72,15 @@ def send_new_message(conversation_id: int) -> ResponseReturnValue:
     if not data or "message" not in data:
         return jsonify({"error": "Missing 'message' field"}), 400
 
-    user_message = data["message"]
+    user_query = data["message"]
     editor_code = data.get("editor_code")  # Optional
     stdout = data.get("stdout")  # Optional
     stderr = data.get("stderr")  # Optional
 
-    logger.debug(f"User message: {user_message}")
+    if not user_query.strip() and not editor_code.strip() and not stdout.strip() and not stderr.strip():
+        raise ValueError("Must provide at least one of: message, editor_code, stdout, stderr")
+
+    logger.debug(f"User message: {user_query}")
     if editor_code is not None:
         logger.debug(f"Editor code included (length: {len(editor_code)})")
     if stdout is not None:
@@ -94,17 +97,15 @@ def send_new_message(conversation_id: int) -> ResponseReturnValue:
             logger.debug(f"Conversation: {conversation.model_dump()}")
 
             # Create user message with code context
-            user_msg = PlaydoMessage.user_message(query=user_message, editor_code=editor_code, stdout=stdout, stderr=stderr)
+            user_msg = PlaydoMessage.user_message(query=user_query, editor_code=editor_code, stdout=stdout, stderr=stderr)
+            updated_conversation = conv_repository.add_messages_to_conversation(conversation_id, [user_msg])
 
             # Get the assistant's response (using the existing conversation messages plus our new user message)
-            new_messages = response_getter._get_next_assistant_resp(conversation.messages, user_message)
+            resp_message: PlaydoMessage = response_getter._get_next_assistant_resp(conversation.messages)
 
-            # Replace the auto-generated user message with our version that includes code context
-            new_messages[0] = user_msg
-
-            logger.debug(f"New messages: {new_messages}")
+            logger.debug(f"New message: {resp_message}")
             # Save the new messages
-            updated_conversation = conv_repository.add_messages_to_conversation(conversation_id, new_messages)
+            updated_conversation = conv_repository.add_messages_to_conversation(conversation_id, resp_message)
             logger.debug(f"Updated conversation: {updated_conversation.model_dump()}")
             # Return the updated conversation with the new messages
             return jsonify(updated_conversation.model_dump())
