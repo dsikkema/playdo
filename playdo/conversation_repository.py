@@ -53,8 +53,8 @@ class ConversationRepository:
         for i, message in enumerate(new_messages, start=next_sequence):
             content_json = json.dumps([c.model_dump() for c in message.content])
             self.cursor.execute(
-                "INSERT INTO message (conversation_id, sequence_number, role, content) VALUES (?, ?, ?, ?)",
-                (conversation_id, i, message.role, content_json),
+                "INSERT INTO message (conversation_id, sequence_number, role, content, editor_code, stdout, stderr) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (conversation_id, i, message.role, content_json, message.editor_code, message.stdout, message.stderr),
             )
 
         # Update conversation timestamp
@@ -75,13 +75,13 @@ class ConversationRepository:
 
         # Get all messages in sequence order
         self.cursor.execute(
-            "SELECT role, content FROM message WHERE conversation_id = ? ORDER BY sequence_number",
+            "SELECT role, content, editor_code, stdout, stderr FROM message WHERE conversation_id = ? ORDER BY sequence_number",
             (id,),
         )
         messages = []
-        for role, content_json in self.cursor.fetchall():
+        for role, content_json, editor_code, stdout, stderr in self.cursor.fetchall():
             content_list = [PlaydoContent.model_validate(c) for c in json.loads(content_json)]
-            messages.append(PlaydoMessage(role=role, content=content_list))
+            messages.append(PlaydoMessage(role=role, content=content_list, editor_code=editor_code, stdout=stdout, stderr=stderr))
 
         logger.debug(f"{conv_row=}")
         created_at = conv_row[0]

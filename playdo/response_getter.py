@@ -27,6 +27,14 @@ class ResponseGetter:
         representing the last message from the user (this is the second to last in returned messages), and the last
         message being the last message from the assistant.
 
+        There's a "bubble" around the Anthropic modelling here: PlaydoMessage objects are more strucutured, with
+        fields Anthropic models do not have. We convert into the Anthropic model layer here before calling the API,
+        and convert back after receiving the response.
+
+        TOODO: Ideally this function receives a PlaydoMessage input for the user's message, so that the calling code
+        can handle already persisting that user message to the database. This way, if the Anthropic API call fails, we
+        can retry without user needing to re-type the message - the message they tried to send will already be there.
+
         @param prev_messages: list of messages to include in the context
         @param user_query: the user's query
         @return: the assistant's response and the updated list of messages
@@ -37,13 +45,11 @@ class ResponseGetter:
         logger.debug(f"{prev_messages=}")
         logger.debug(f"User message: {user_msg}")
 
-        assert not settings.TESTING, "This function is not mocked in tests"
+        assert not settings.TESTING, "Must mock this class during tests to avoid hitting Anthropic API"
         messages = prev_messages + [user_msg]
 
         # Convert PlaydoMessage objects to MessageParam objects that Anthropic's API expects
-        message_params: List[MessageParam] = [
-            {"role": msg.role, "content": [{"type": "text", "text": content.text} for content in msg.content]} for msg in messages
-        ]
+        message_params: List[MessageParam] = [msg.to_anthropic_message() for msg in messages]
 
         resp: Message = self.anthropic_client.messages.create(
             model=settings.ANTHROPIC_MODEL,
@@ -51,6 +57,6 @@ class ResponseGetter:
             messages=message_params,
         )
 
-        latest_msg = PlaydoMessage.anthropic_message(resp)
+        latest_msg = PlaydoMessage.from_anthropic_message(resp)
         logger.debug(f"Latest message: {latest_msg}")
         return [user_msg, latest_msg]

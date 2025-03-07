@@ -23,8 +23,16 @@ def mock_response_getter() -> Generator[MagicMock, None, None]:
     """Mock the ResponseGetter to avoid calling the Anthropic API during tests."""
     with patch("playdo.response_getter.ResponseGetter._get_next_assistant_resp") as mock_method:
         mock_method.return_value = [
-            PlaydoMessage(role="user", content=[PlaydoContent(type="text", text="Hello")]),
-            PlaydoMessage(role="assistant", content=[PlaydoContent(type="text", text="Hi there! How can I help you today?")]),
+            PlaydoMessage(
+                role="user", content=[PlaydoContent(type="text", text="Hello")], editor_code=None, stdout=None, stderr=None
+            ),
+            PlaydoMessage(
+                role="assistant",
+                content=[PlaydoContent(type="text", text="Hi there! How can I help you today?")],
+                editor_code=None,
+                stdout=None,
+                stderr=None,
+            ),
         ]
         yield mock_method
 
@@ -146,3 +154,40 @@ def test_list_conversations_after_creating(client: FlaskClient) -> None:
     data = json.loads(response.data)
     assert "conversation_ids" in data
     assert len(data["conversation_ids"]) == 3
+
+
+def test_send_message_with_code_context(client: FlaskClient, mock_response_getter: MagicMock) -> None:
+    """Test adding a message with code context to a conversation."""
+    # First create a conversation
+    create_conv_resp = client.post("/api/conversations")
+    create_conv_data = json.loads(create_conv_resp.data)
+    conversation_id = create_conv_data["id"]
+
+    # Then add a message with code context
+    message_data = {
+        "message": "Can you explain this code?",
+        "editor_code": "print('Hello, world!')",
+        "stdout": "Hello, world!",
+        "stderr": None,
+    }
+
+    conversation_response = client.post(
+        f"/api/conversations/{conversation_id}/send_message", json=message_data, content_type="application/json"
+    )
+
+    assert conversation_response.status_code == 200
+    conversation_data = json.loads(conversation_response.data)
+
+    assert "messages" in conversation_data
+    assert "id" in conversation_data
+    assert len(conversation_data["messages"]) == 2
+
+    # Check user message has code context
+    user_message = conversation_data["messages"][0]
+    assert user_message["role"] == "user"
+    assert user_message["editor_code"] == "print('Hello, world!')"
+    assert user_message["stdout"] == "Hello, world!"
+    assert user_message["stderr"] is None
+
+    # Check assistant message
+    assert conversation_data["messages"][1]["role"] == "assistant"

@@ -100,6 +100,39 @@ The typical data flow in Playdo involves:
 
 5. **Response Delivery** - The API sends responses back to the frontend for display to the user.
 
+## Code Editor Integration
+
+Playdo integrates the code editor with the chat interface, allowing the AI tutor to have context about the student's code and its output:
+
+1. **Message Structure** - Messages now include optional fields for:
+   - `editor_code`: The code currently in the editor
+   - `stdout`: Standard output from running the code
+   - `stderr`: Standard error from running the code
+
+2. **XML Transformation** - User messages with code context are transformed into an XML format when sent to the Claude API:
+   ```xml
+   <message>
+     <text>User's message text</text>
+     <code>Python code from editor</code>
+     <stdout>Output from running the code</stdout>
+     <stderr status="not_run" />
+   </message>
+   ```
+
+3. **Automatic Context Inclusion** - When a student sends a message, their current code and output are automatically included with the message, ensuring the AI tutor has the necessary context without manual sharing.
+
+4. **API Endpoint** - The `/conversations/{id}/send_message` endpoint now accepts:
+   ```json
+   {
+     "message": "User's message text",
+     "editor_code": "print('Hello, world!')",
+     "stdout": "Hello, world!",
+     "stderr": null
+   }
+   ```
+
+5. **Efficiency** - The XML representation is designed to be token-efficient, using status attributes to indicate when code hasn't been run rather than including redundant explanations.
+
 ## Key Design Principles
 
 Playdo follows several key design principles:
@@ -115,6 +148,8 @@ Playdo follows several key design principles:
 5. **Environment-based Configuration** - All configuration is managed via environment variables.
 
 6. **REST API Design** - The backend exposes a RESTful API for the frontend to consume.
+
+7. **Seamless Context Sharing** - The system automatically ensures the AI tutor has the context it needs without the student having to think about it.
 
 ## Technical Dependencies
 
