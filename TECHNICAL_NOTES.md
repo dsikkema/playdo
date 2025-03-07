@@ -122,41 +122,56 @@ Playdo integrates the code editor with the chat interface, allowing the AI tutor
      <text>User's message text</text>
      <code>Python code from editor</code>
      <stdout>Output from running the code</stdout>
-     <stderr status="not_run" />
+     <stderr></stderr>
    </message>
    ```
 
-3. **Automatic Context Inclusion** - When a student sends a message, their current code and output are automatically included with the message, ensuring the AI tutor has the necessary context without manual sharing.
+   Alternately:
+   ```xml
+   <message>
+     <text>User's message text</text>
+     <code>Python code from editor (has not been run, therefore no stdout or stderr)</code>
+     <stdout status="not_run"/>
+     <stderr status="not_run"/>
+   </message>
+   ```
 
-4. **API Endpoint** - The `/conversations/{id}/send_message` endpoint now accepts:
+3. **Field Validation Rules** - The API enforces specific validation rules for code-related fields:
+   - If `editor_code` is null, then `stdout` and `stderr` must also be null (indicating no code change since the last run)
+   - If `editor_code` is not null, then `stdout` and `stderr` may still be null (if the user hasn't run the code yet)
+   - Empty string values for `editor_code`, `stdout`, or `stderr` are valid and distinct from null values - they represent actual empty strings in these fields
+   - A null value indicates absence of data (code not run yet), while an empty string represents an intentional empty value
+   - stdout and stderr are "both or neither" - if one is provided, the other must also be provided
+
+4. **Automatic Context Inclusion** - When a student sends a message, their current code and output are automatically included with the message (but only if code content has changed since the last time it was sent), ensuring the AI tutor has the necessary context without manual sharing.
+
+5. **API Endpoint** - The `/conversations/{id}/send_message` endpoint now accepts:
    ```json
    {
      "message": "User's message text",
      "editor_code": "print('Hello, world!')",
      "stdout": "Hello, world!",
-     "stderr": null
+     "stderr": ""
    }
    ```
 
-5. **Efficiency** - The XML representation is designed to be token-efficient, using status attributes to indicate when code hasn't been run rather than including redundant explanations.
+6. **Efficiency** - The XML representation is designed to be token-efficient, using status attributes to indicate when code hasn't been run rather than including redundant explanations.
 
 ## Key Design Principles
 
 Playdo follows several key design principles:
 
-1. **Clean Separation of Concerns** - Components have specific responsibilities with minimal overlap.
+1. **Repository Pattern** - Database operations are encapsulated in repository classes.
 
-2. **Repository Pattern** - Database operations are encapsulated in repository classes.
+2. **Context Managers** - Resources like database connections are managed with context managers for proper cleanup.
 
-3. **Context Managers** - Resources like database connections are managed with context managers for proper cleanup.
+3. **Type Safety** - Extensive use of type hints and Pydantic models for runtime type checking.
 
-4. **Type Safety** - Extensive use of type hints and Pydantic models for runtime type checking.
+4. **Environment-based Configuration** - All configuration is managed via environment variables.
 
-5. **Environment-based Configuration** - All configuration is managed via environment variables.
+5. **REST API Design** - The backend exposes a RESTful API for the frontend to consume.
 
-6. **REST API Design** - The backend exposes a RESTful API for the frontend to consume.
-
-7. **Seamless Context Sharing** - The system automatically ensures the AI tutor has the context it needs without the student having to think about it.
+6. **Seamless Context Sharing** - The system automatically ensures the AI tutor has the context it needs without the student having to think about it.
 
 ## Technical Dependencies
 
@@ -192,13 +207,19 @@ The Playdo application integrates with the Anthropic Claude API to generate AI r
    - The Claude API returns an assistant response that is converted back to Playdo's format
    - The method returns only the assistant's response message, not a list including both the user's and assistant's messages
 
-2. **Conversation Handling** - The new design improves error handling and message management:
+2. **Model Conversion Bubble** - The ResponseGetter implements a "bubble" pattern to handle model conversion:
+   - PlaydoMessage objects (with editor_code, stdout, stderr fields) enter the bubble
+   - Inside the bubble, they are converted to Anthropic's MessageParam objects
+   - After receiving the response from Anthropic API, Anthropic Message objects are converted back to PlaydoMessage objects
+   - This encapsulation creates a clear boundary around the external API integration, isolating model differences
+
+3. **Conversation Handling** - The new design improves error handling and message management:
    - User messages are saved to the database before calling the AI API, ensuring they're preserved even if the API call fails
    - The complete conversation history (including the newly saved user message) is sent to the ResponseGetter
    - ResponseGetter returns only the assistant's response message
    - The assistant message is then saved to the database separately
 
-3. **Model Conversion** - The code manages conversion between Playdo's internal models and Anthropic's API models:
+4. **Model Conversion** - The code manages conversion between Playdo's internal models and Anthropic's API models:
    - PlaydoMessage objects include additional metadata like editor code and outputs
    - These are converted to Anthropic's MessageParam objects for API requests
    - Anthropic Message objects are converted back to PlaydoMessage objects for internal use
