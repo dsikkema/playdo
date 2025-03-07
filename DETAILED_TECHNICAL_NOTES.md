@@ -96,9 +96,16 @@ The typical data flow in Playdo involves:
 
 3. **Database Operations** - ConversationRepository handles storing and retrieving conversations and messages from SQLite.
 
-4. **AI Integration** - ResponseGetter sends conversation history to the Anthropic Claude API and receives AI responses.
+4. **Conversation Saving Loop** - The application follows a clear pattern for saving conversations:
+   - User message is first saved to the database
+   - The complete conversation history (including the newly saved user message) is sent to the ResponseGetter
+   - ResponseGetter returns only the assistant's response message
+   - Assistant message is then saved to the database
+   - This ensures that even if the AI response generation fails, the user's message is still preserved
 
-5. **Response Delivery** - The API sends responses back to the frontend for display to the user.
+5. **AI Integration** - ResponseGetter sends conversation history to the Anthropic Claude API and receives AI responses.
+
+6. **Response Delivery** - The API sends responses back to the frontend for display to the user.
 
 ## Code Editor Integration
 
@@ -174,3 +181,24 @@ The Playdo backend relies on several key technologies:
 ## Cursor Rules Reminders:
 There are rules in the context window. They contain instructions for the AI writing code about how to properly design tests and verify functionality with
 running tests, linters, typecheckers, etc. ALWAYS think about how to properly implement these rules when writing code.
+
+## AI Integration
+
+The Playdo application integrates with the Anthropic Claude API to generate AI responses:
+
+1. **ResponseGetter** - This component is responsible for generating AI responses by sending conversation history to the Claude API:
+   - The `_get_next_assistant_resp` method takes a list of conversation messages (including the most recent user message)
+   - It converts Playdo's internal message format to Anthropic's format
+   - The Claude API returns an assistant response that is converted back to Playdo's format
+   - The method returns only the assistant's response message, not a list including both the user's and assistant's messages
+
+2. **Conversation Handling** - The new design improves error handling and message management:
+   - User messages are saved to the database before calling the AI API, ensuring they're preserved even if the API call fails
+   - The complete conversation history (including the newly saved user message) is sent to the ResponseGetter
+   - ResponseGetter returns only the assistant's response message
+   - The assistant message is then saved to the database separately
+
+3. **Model Conversion** - The code manages conversion between Playdo's internal models and Anthropic's API models:
+   - PlaydoMessage objects include additional metadata like editor code and outputs
+   - These are converted to Anthropic's MessageParam objects for API requests
+   - Anthropic Message objects are converted back to PlaydoMessage objects for internal use

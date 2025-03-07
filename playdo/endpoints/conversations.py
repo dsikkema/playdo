@@ -64,6 +64,16 @@ def send_new_message(conversation_id: int) -> ResponseReturnValue:
     - editor_code: The code in the editor (optional)
     - stdout: Standard output from running the code (optional)
     - stderr: Standard error from running the code (optional)
+
+    If editor_code is null, this means the user has not changed the code since the last time they ran it and therefore the frontend is skipping
+    sending the duplicate code, and stdout and stderr must also be null. However, if editor_code is not null, then both stdout and stderr may
+    still be null, because the user may not have run the code yet. In any case, an empty string value for editor_code, stdout, or stderr is
+    valid and completely different from a null value: it represents the code, or the output, or the error, actually being empty strings.
+
+    a null value for either stdout or stderr is valid and represents the fact that the code has not been run yet.
+
+    an empty string value for any of editor_code, stdout, or stderr is valid and completely different from null, and represents the fact that
+    the code, the output, or the error, respectively, are empty strings.
     """
     if not request.is_json:
         return jsonify({"error": "Request must be JSON"}), 400
@@ -74,11 +84,24 @@ def send_new_message(conversation_id: int) -> ResponseReturnValue:
 
     user_query = data["message"]
     editor_code = data.get("editor_code")  # Optional
+
+    # If code has not run, then stdout and stderr must both be null (in xml this will be represented as
+    # `status="not_run"`). If, on the other hand, code _has_ been run, then _both_ stdout and stderr
+    # must be provided (though they may be empty strings in case of empty output)
     stdout = data.get("stdout")  # Optional
     stderr = data.get("stderr")  # Optional
 
+    if editor_code is None:
+        if stdout is not None or stderr is not None:
+            return jsonify({"error": "Cannot provide stdout or stderr if editor_code is null"}), 400
+
+    if (stdout is None) != (stderr is None):
+        return jsonify(
+            {"error": "Must provide both stdout and stderr if code has been run, or neither if code has not been run"}
+        ), 400
+
     if not user_query.strip() and not editor_code.strip() and not stdout.strip() and not stderr.strip():
-        raise ValueError("Must provide at least one of: message, editor_code, stdout, stderr")
+        return jsonify({"error": "Must provide at least one of: message, editor_code, stdout, stderr"}), 400
 
     logger.debug(f"User message: {user_query}")
     if editor_code is not None:
@@ -92,20 +115,16 @@ def send_new_message(conversation_id: int) -> ResponseReturnValue:
     with app.conversation_repository() as conv_repository:
         response_getter = ResponseGetter()
         try:
-            # Get the existing conversation
-            conversation = conv_repository.get_conversation(conversation_id)
-            logger.debug(f"Conversation: {conversation.model_dump()}")
-
             # Create user message with code context
             user_msg = PlaydoMessage.user_message(query=user_query, editor_code=editor_code, stdout=stdout, stderr=stderr)
             updated_conversation = conv_repository.add_messages_to_conversation(conversation_id, [user_msg])
 
             # Get the assistant's response (using the existing conversation messages plus our new user message)
-            resp_message: PlaydoMessage = response_getter._get_next_assistant_resp(conversation.messages)
+            resp_message: PlaydoMessage = response_getter._get_next_assistant_resp(updated_conversation.messages)
 
             logger.debug(f"New message: {resp_message}")
             # Save the new messages
-            updated_conversation = conv_repository.add_messages_to_conversation(conversation_id, resp_message)
+            updated_conversation = conv_repository.add_messages_to_conversation(conversation_id, [resp_message])
             logger.debug(f"Updated conversation: {updated_conversation.model_dump()}")
             # Return the updated conversation with the new messages
             return jsonify(updated_conversation.model_dump())

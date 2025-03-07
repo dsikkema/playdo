@@ -24,7 +24,7 @@ class ResponseGetter:
 
         The response_getter object just gets the latest message from Claude. It takes a list of previous messages and
         returns the reponse from the assistant.
-        
+
         The most recent user's message is expected to be the last item in the list of previous messages, added there by
         the calling code.
 
@@ -34,7 +34,7 @@ class ResponseGetter:
 
         TOODO: something possible for future token-optimization (but stopping short of conversation summarization), just
         omit the code/output from being rendered into the conversation context sent to Claude IFF there are N or more
-        _more recent_ code updates that have been sent afterwards. In other words, keep the user's text messages no 
+        _more recent_ code updates that have been sent afterwards. In other words, keep the user's text messages no
         matter how old, but drop code/output that's "outdated" by newer code updates.
 
         @param prev_messages: list of messages to include in the context (includes the user's most recent message)

@@ -213,7 +213,7 @@ Update existing tests to work with the new schemas:
 
 2. **Compatibility Layer**: During migration, you may need a compatibility layer to convert between Pydantic and marshmallow-dataclass models.
 
-3. **Error Handling**: Ensure APIFlask error responses match your current error format or update the frontend to handle the new format.
+3. **Error Handling**: Ensure APIFlask error responses match your current error format.
 
 4. **Database Impact**: The migration should not impact the database schema, but verify this with tests.
 
@@ -221,6 +221,8 @@ Update existing tests to work with the new schemas:
 
 6. **Type Annotations**: Make sure to maintain proper type annotations for mypy.
 
+7. **API errors**: Look at the error responses in the existing endpoints (like custom validation errors) and ensure that these possible
+error responses are properly represented in the schema, and communicated appropriately inside the annotations that decorate the endpoint functions.
 ### Technical Decisions
 
 1. **Why APIFlask over Flask-RESTful or Flask-RESTX?**

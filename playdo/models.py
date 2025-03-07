@@ -6,6 +6,7 @@ and also well-typed (unlike dictionaries).
 from typing import Optional, Literal
 from anthropic.types import Message, ContentBlock, MessageParam
 import xml.etree.ElementTree as ET
+import xml.dom.minidom
 import datetime
 
 from pydantic import BaseModel
@@ -59,6 +60,8 @@ class PlaydoMessage(BaseModel):
         """
         Convert the message to an XML representation for Anthropic API.
         This is a token-efficient way to include code context in messages.
+
+        Uses whitespace in rendered xml to make it easier to read (both by humans and AI)
         """
         root = ET.Element("message")
 
@@ -88,7 +91,9 @@ class PlaydoMessage(BaseModel):
             stderr_elem.set("status", "not_run")
 
         # Convert to string
-        return ET.tostring(root, encoding="unicode")
+        raw_xml_str = ET.tostring(root, encoding="unicode")
+        dom = xml.dom.minidom.parseString(raw_xml_str)
+        return dom.toprettyxml(indent="  ")
 
     def to_anthropic_message(self) -> MessageParam:
         """

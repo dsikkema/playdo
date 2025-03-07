@@ -42,6 +42,12 @@ class ConversationRepository:
         Add new messages to an existing conversation.
         TOODO: transactional safety. database race condition here.
         """
+        # verify conversation exists
+        self.cursor.execute("SELECT * FROM conversation WHERE id = ?", (conversation_id,))
+        conv_row = self.cursor.fetchone()
+        if conv_row is None:
+            raise ValueError(f"Conversation with id {conversation_id} not found")
+
         # Get the next sequence number
         self.cursor.execute(
             "SELECT COALESCE(MAX(sequence_number), -1) + 1 FROM message WHERE conversation_id = ?",

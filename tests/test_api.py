@@ -3,7 +3,7 @@ Tests for the Flask API endpoints.
 """
 
 import pytest
-from typing import Generator
+from typing import Generator, Optional
 import json
 from unittest.mock import patch, MagicMock
 from flask.testing import FlaskClient
@@ -22,18 +22,13 @@ def client(test_app: PlaydoApp) -> FlaskClient:
 def mock_response_getter() -> Generator[MagicMock, None, None]:
     """Mock the ResponseGetter to avoid calling the Anthropic API during tests."""
     with patch("playdo.response_getter.ResponseGetter._get_next_assistant_resp") as mock_method:
-        mock_method.return_value = [
-            PlaydoMessage(
-                role="user", content=[PlaydoContent(type="text", text="Hello")], editor_code=None, stdout=None, stderr=None
-            ),
-            PlaydoMessage(
-                role="assistant",
-                content=[PlaydoContent(type="text", text="Hi there! How can I help you today?")],
-                editor_code=None,
-                stdout=None,
-                stderr=None,
-            ),
-        ]
+        mock_method.return_value = PlaydoMessage(
+            role="assistant",
+            content=[PlaydoContent(type="text", text="Hi there! How can I help you today?")],
+            editor_code=None,
+            stdout=None,
+            stderr=None,
+        )
         yield mock_method
 
 
@@ -168,7 +163,7 @@ def test_send_message_with_code_context(client: FlaskClient, mock_response_gette
         "message": "Can you explain this code?",
         "editor_code": "print('Hello, world!')",
         "stdout": "Hello, world!",
-        "stderr": None,
+        "stderr": "",
     }
 
     conversation_response = client.post(
@@ -187,7 +182,99 @@ def test_send_message_with_code_context(client: FlaskClient, mock_response_gette
     assert user_message["role"] == "user"
     assert user_message["editor_code"] == "print('Hello, world!')"
     assert user_message["stdout"] == "Hello, world!"
+    assert user_message["stderr"] == ""
+
+    # Check assistant message
+    assert conversation_data["messages"][1]["role"] == "assistant"
+
+
+def test_send_message_with_code_no_output(client: FlaskClient, mock_response_getter: MagicMock) -> None:
+    """
+    This case is valid
+    """
+    # Create a conversation first
+    response = client.post("/api/conversations", json={"name": "Test conversation"})
+    assert response.status_code == 201
+    conversation_id = response.get_json()["id"]
+
+    # Set up the mock response
+    mock_response = {"message": "I'm the assistant response"}
+    mock_response_getter.get_response.return_value = mock_response
+
+    # Send message with code but no output (valid case)
+    message_data = {"message": "Help me with this code", "editor_code": "print('Hello world')", "stdout": None, "stderr": None}
+
+    response = client.post(f"/api/conversations/{conversation_id}/send_message", json=message_data)
+    assert response.status_code == 200
+
+    # Verify the response contains the expected data
+    conversation_data = response.get_json()
+    assert "id" in conversation_data
+    assert "messages" in conversation_data
+    assert len(conversation_data["messages"]) == 2
+
+    # Check user message
+    user_message = conversation_data["messages"][0]
+    assert user_message["role"] == "user"
+    assert user_message["editor_code"] == "print('Hello world')"
+    assert user_message["stdout"] is None
     assert user_message["stderr"] is None
 
     # Check assistant message
     assert conversation_data["messages"][1]["role"] == "assistant"
+
+
+@pytest.mark.parametrize(
+    "stdout, stderr",
+    [
+        (None, "errors!"),
+        ("outputs!", None),
+    ],
+)
+def test_send_message_bothneither_outerr(
+    client: FlaskClient, mock_response_getter: MagicMock, stdout: Optional[str], stderr: Optional[str]
+) -> None:
+    """
+    Even when code is provided, both or neither of stdout and stderr must be provided. If one and not the other, expect an error.
+    """
+    # Create a conversation first
+    response = client.post("/api/conversations", json={"name": "Test conversation"})
+    assert response.status_code == 201
+    conversation_id = response.get_json()["id"]
+
+    # Send message with mismatched stdout/stderr (should fail)
+    message_data = {
+        "message": "Help me with this code",
+        "editor_code": "print('Hello world')",
+        "stdout": stdout,
+        "stderr": stderr,
+    }
+
+    response = client.post(f"/api/conversations/{conversation_id}/send_message", json=message_data)
+    assert response.status_code == 400
+
+    # Verify the error message
+    error_data = response.get_json()
+    assert "error" in error_data
+    assert error_data["error"] == "Must provide both stdout and stderr if code has been run, or neither if code has not been run"
+
+
+def test_send_message_output_with_no_code(client: FlaskClient, mock_response_getter: MagicMock) -> None:
+    """
+    If code has not been run (editor_code is null), stdout and stderr must both be null.
+    """
+    # Create a conversation first
+    response = client.post("/api/conversations", json={"name": "Test conversation"})
+    assert response.status_code == 201
+    conversation_id = response.get_json()["id"]
+
+    # Send message with no code but with output (should fail)
+    message_data = {"message": "Help me with this code", "editor_code": None, "stdout": "Some output", "stderr": ""}
+
+    response = client.post(f"/api/conversations/{conversation_id}/send_message", json=message_data)
+    assert response.status_code == 400
+
+    # Verify the error message
+    error_data = response.get_json()
+    assert "error" in error_data
+    assert error_data["error"] == "Cannot provide stdout or stderr if editor_code is null"

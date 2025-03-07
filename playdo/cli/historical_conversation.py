@@ -86,12 +86,14 @@ class HistoricalConversation:
         """
 
         if conversation.messages:
-            print("Conversation history:")
+            print("Conversation history:\n")
             for message in conversation.messages:
+                # if it's a user message AND if code or output is present, then print the xml representation for debugging help
                 print(f"{message.role}: {message.content[0].text}")
-
+                if message.role == "user" and (message.editor_code or message.stdout or message.stderr):
+                    print(f"XML:\n{message.to_anthropic_xml()}")
         while True:
-            print("Enter your message (Ctrl-D to send): ")
+            print("\nEnter your message (Ctrl-D to send): ")
             try:
                 user_message_str = sys.stdin.read()
                 if user_message_str.strip() == "":
