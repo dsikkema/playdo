@@ -30,13 +30,16 @@ def test_historical_conversation_new_conversation_flow() -> None:
     mock_conversation_history.add_messages_to_conversation.side_effect = add_messages_side_effect
 
     # Set up mock response getter
-    def get_next_assistant_resp_side_effect(messages: List[PlaydoMessage], user_input: str) -> List[PlaydoMessage]:
-        # Create a user message and an assistant response
-        user_message = PlaydoMessage(role="user", content=[PlaydoContent(type="text", text=user_input)])
+    def get_next_assistant_resp_side_effect(messages: List[PlaydoMessage]) -> PlaydoMessage:
+        # Create an assistant response based on the last message in the list
+        user_input = ""
+        if messages and messages[-1].role == "user" and messages[-1].content:
+            user_input = messages[-1].content[0].text
+
         assistant_message = PlaydoMessage(
             role="assistant", content=[PlaydoContent(type="text", text=f"Response to: {user_input}")]
         )
-        return [user_message, assistant_message]
+        return assistant_message
 
     mock_response_getter._get_next_assistant_resp.side_effect = get_next_assistant_resp_side_effect
 
@@ -71,21 +74,21 @@ def test_historical_conversation_new_conversation_flow() -> None:
 
     # Check first call
     args, _ = mock_response_getter._get_next_assistant_resp.call_args_list[0]
-    assert args[0] == []  # Empty messages list for a new conversation
-    assert args[1] == "Hello, assistant!"  # First user input
+    assert len(args[0]) == 1  # List containing the user message after it's been added
+    assert args[0][0].content[0].text == "Hello, assistant!"  # First user message content
 
     # Check second call
     args, _ = mock_response_getter._get_next_assistant_resp.call_args_list[1]
-    assert len(args[0]) == 2  # Two messages from first exchange
-    assert args[1] == "Tell me more about Python."  # Second user input
+    assert len(args[0]) == 3  # Three messages: user and assistant from first exchange, plus new user
+    assert args[0][2].content[0].text == "Tell me more about Python."  # Second user message content
 
     # Check third call
     args, _ = mock_response_getter._get_next_assistant_resp.call_args_list[2]
-    assert len(args[0]) == 4  # Four messages from first two exchanges
-    assert args[1] == "How do I use pytest?"  # Third user input
+    assert len(args[0]) == 5  # Five messages from first two exchanges plus new user
+    assert args[0][4].content[0].text == "How do I use pytest?"  # Third user message content
 
-    # Should have saved the new messages three times
-    assert mock_conversation_history.add_messages_to_conversation.call_count == 3
+    # Should have saved messages six times (two saves per exchange: user message and assistant response)
+    assert mock_conversation_history.add_messages_to_conversation.call_count == 6
 
     # Check the final state of messages
     assert len(updated_messages) == 6  # Three user messages and three assistant responses
@@ -133,13 +136,16 @@ def test_historical_conversation_load_existing_conversation() -> None:
     mock_conversation_history.add_messages_to_conversation.side_effect = add_messages_side_effect
 
     # Set up mock response getter
-    def get_next_assistant_resp_side_effect(messages: List[PlaydoMessage], user_input: str) -> List[PlaydoMessage]:
-        # Create a user message and an assistant response
-        user_message = PlaydoMessage(role="user", content=[PlaydoContent(type="text", text=user_input)])
+    def get_next_assistant_resp_side_effect(messages: List[PlaydoMessage]) -> PlaydoMessage:
+        # Create an assistant response based on the last message in the list
+        user_input = ""
+        if messages and messages[-1].role == "user" and messages[-1].content:
+            user_input = messages[-1].content[0].text
+
         assistant_message = PlaydoMessage(
             role="assistant", content=[PlaydoContent(type="text", text=f"Response to: {user_input}")]
         )
-        return [user_message, assistant_message]
+        return assistant_message
 
     mock_response_getter._get_next_assistant_resp.side_effect = get_next_assistant_resp_side_effect
 
@@ -170,14 +176,24 @@ def test_historical_conversation_load_existing_conversation() -> None:
     # Should have called response getter with the existing messages
     mock_response_getter._get_next_assistant_resp.assert_called_once()
     args, _ = mock_response_getter._get_next_assistant_resp.call_args
-    assert args[0] == existing_messages  # Should pass existing messages
-    assert args[1] == "Continue the conversation!"  # User input
+    assert len(args[0]) == 5  # Should pass existing messages plus new user message
+    assert args[0][4].content[0].text == "Continue the conversation!"  # Last message is user message
 
-    # Should have saved the new messages
-    mock_conversation_history.add_messages_to_conversation.assert_called_once()
-    args, _ = mock_conversation_history.add_messages_to_conversation.call_args
+    # Should have saved the new messages twice (once for user message, once for assistant response)
+    assert mock_conversation_history.add_messages_to_conversation.call_count == 2
+
+    # First call should save the user message
+    args, _ = mock_conversation_history.add_messages_to_conversation.call_args_list[0]
     assert args[0] == 10  # Conversation ID
-    assert len(args[1]) == 2  # Two new messages (user and assistant)
+    assert len(args[1]) == 1  # One new message (user)
+    assert args[1][0].role == "user"
+    assert args[1][0].content[0].text == "Continue the conversation!"
+
+    # Second call should save the assistant response
+    args, _ = mock_conversation_history.add_messages_to_conversation.call_args_list[1]
+    assert args[0] == 10  # Conversation ID
+    assert len(args[1]) == 1  # One new message (assistant)
+    assert args[1][0].role == "assistant"
 
     # Check the final state of messages
     assert len(updated_messages) == 6  # Four existing messages plus two new ones

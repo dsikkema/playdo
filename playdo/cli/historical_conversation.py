@@ -18,7 +18,7 @@ from typing import Optional
 import anthropic
 from playdo.response_getter import ResponseGetter
 from playdo.conversation_repository import ConversationRepository
-from playdo.models import ConversationHistory
+from playdo.models import ConversationHistory, PlaydoMessage
 import logging
 
 logger = logging.getLogger("playdo")
@@ -86,12 +86,14 @@ class HistoricalConversation:
         """
 
         if conversation.messages:
-            print("Conversation history:")
+            print("Conversation history:\n")
             for message in conversation.messages:
+                # if it's a user message AND if code or output is present, then print the xml representation for debugging help
                 print(f"{message.role}: {message.content[0].text}")
-
+                if message.role == "user" and (message.editor_code or message.stdout or message.stderr):
+                    print(f"XML:\n{message.to_anthropic_xml()}")
         while True:
-            print("Enter your message (Ctrl-D to finish): ")
+            print("\nEnter your message (Ctrl-D to send): ")
             try:
                 user_message_str = sys.stdin.read()
                 if user_message_str.strip() == "":
@@ -103,13 +105,15 @@ class HistoricalConversation:
 
             try:
                 # Get updated messages from response getter
-                new_messages = self.response_getter._get_next_assistant_resp(conversation.messages, user_message_str)
+                user_msg = PlaydoMessage.user_message(query=user_message_str)
+                conversation = self.conversation_history.add_messages_to_conversation(conversation.id, [user_msg])
+                response: PlaydoMessage = self.response_getter._get_next_assistant_resp(conversation.messages)
 
                 # Save only the new messages
-                conversation = self.conversation_history.add_messages_to_conversation(conversation.id, new_messages)
+                conversation = self.conversation_history.add_messages_to_conversation(conversation.id, [response])
 
                 # Print the assistant's response (last message)
-                print(f"\nAssistant: {new_messages[-1].content[0].text}\n")
+                print(f"\nAssistant: {response.content[0].text}\n")
 
             except anthropic.InternalServerError as e:
                 print(f"Error: {e}")

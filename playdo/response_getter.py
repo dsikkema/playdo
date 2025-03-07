@@ -18,32 +18,34 @@ class ResponseGetter:
     def __init__(self) -> None:
         self.anthropic_client = Anthropic()
 
-    def _get_next_assistant_resp(self, prev_messages: list[PlaydoMessage], user_query: str) -> list[PlaydoMessage]:
+    def _get_next_assistant_resp(self, prev_messages: list[PlaydoMessage]) -> PlaydoMessage:
         """
         Get the next assistant response. Return the message and the updated list of messages.
 
         The response_getter object just gets the latest message from Claude. It takes a list of previous messages and
-        returns an updated message list - really the new message list will contain _two new message objects_, one
-        representing the last message from the user (this is the second to last in returned messages), and the last
-        message being the last message from the assistant.
+        returns the reponse from the assistant.
 
-        @param prev_messages: list of messages to include in the context
-        @param user_query: the user's query
-        @return: the assistant's response and the updated list of messages
+        The most recent user's message is expected to be the last item in the list of previous messages, added there by
+        the calling code.
+
+        There's a "bubble" around the Anthropic modeling here: PlaydoMessage objects are more strucutured, with
+        fields Anthropic models do not have. We convert into the Anthropic model layer here before calling the API,
+        and convert back after receiving the response.
+
+        TOODO: something possible for future token-optimization (but stopping short of conversation summarization), just
+        omit the code/output from being rendered into the conversation context sent to Claude IFF there are N or more
+        _more recent_ code updates that have been sent afterwards. In other words, keep the user's text messages no
+        matter how old, but drop code/output that's "outdated" by newer code updates.
+
+        @param prev_messages: list of messages to include in the context (includes the user's most recent message)
+        @return: the assistant's response
         """
-        if user_query.strip() == "":
-            raise ValueError("User query is empty")
-        user_msg = PlaydoMessage.user_message(user_query)
         logger.debug(f"{prev_messages=}")
-        logger.debug(f"User message: {user_msg}")
 
-        assert not settings.TESTING, "This function is not mocked in tests"
-        messages = prev_messages + [user_msg]
+        assert not settings.TESTING, "Must mock this class during tests to avoid hitting Anthropic API"
 
-        # Convert PlaydoMessage objects to MessageParam objects that Anthropic's API expects
-        message_params: List[MessageParam] = [
-            {"role": msg.role, "content": [{"type": "text", "text": content.text} for content in msg.content]} for msg in messages
-        ]
+        # 'bubble begin': Convert PlaydoMessage objects to MessageParam objects that Anthropic's API expects
+        message_params: List[MessageParam] = [msg.to_anthropic_message() for msg in prev_messages]
 
         resp: Message = self.anthropic_client.messages.create(
             model=settings.ANTHROPIC_MODEL,
@@ -51,6 +53,8 @@ class ResponseGetter:
             messages=message_params,
         )
 
-        latest_msg = PlaydoMessage.anthropic_message(resp)
+        latest_msg = PlaydoMessage.from_anthropic_message(resp)
+        # 'bubble end' (line above): Convert Anthropic Message objects back to PlaydoMessage objects
+
         logger.debug(f"Latest message: {latest_msg}")
-        return [user_msg, latest_msg]
+        return latest_msg
