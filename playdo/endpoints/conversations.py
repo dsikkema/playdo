@@ -86,7 +86,7 @@ def send_new_message(conversation_id: int) -> ResponseReturnValue:
     editor_code = data.get("editor_code")  # Optional
 
     # If code has not run, then stdout and stderr must both be null (in xml this will be represented as
-    # `status="not_run"`). If, on the other hand, code _has_ been run, then _both_ stdout and stderr
+    # `status="stale_or_not_run"`). If, on the other hand, code _has_ been run, then _both_ stdout and stderr
     # must be provided (though they may be empty strings in case of empty output)
     stdout = data.get("stdout")  # Optional
     stderr = data.get("stderr")  # Optional

@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import Optional
 
@@ -32,7 +33,19 @@ def create_app(database_path: Optional[str] = None, testing: bool = False) -> Pl
 app = create_app()
 
 
+def _configure_logging():
+    logger = logging.getLogger("playdo")
+    level = logging.DEBUG if settings.DEBUG else logging.INFO
+    logger.setLevel(level)
+    handler = logging.StreamHandler()
+    handler.setLevel(level)
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+
 def main():
+    _configure_logging()
     app.run(debug=settings.DEBUG, host="0.0.0.0")
 
 

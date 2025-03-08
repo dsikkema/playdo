@@ -80,7 +80,7 @@ class PlaydoMessage(BaseModel):
             stdout_elem.text = self.stdout
         else:
             stdout_elem = ET.SubElement(root, "stdout")
-            stdout_elem.set("status", "not_run")
+            stdout_elem.set("status", "stale_or_not_run")
 
         # Add stderr if present, otherwise add empty element with status
         if self.stderr is not None:
@@ -88,7 +88,7 @@ class PlaydoMessage(BaseModel):
             stderr_elem.text = self.stderr
         else:
             stderr_elem = ET.SubElement(root, "stderr")
-            stderr_elem.set("status", "not_run")
+            stderr_elem.set("status", "stale_or_not_run")
 
         # Convert to string
         raw_xml_str = ET.tostring(root, encoding="unicode")
