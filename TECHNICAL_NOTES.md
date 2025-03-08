@@ -131,8 +131,8 @@ Playdo integrates the code editor with the chat interface, allowing the AI tutor
    <message>
      <text>User's message text</text>
      <code>Python code from editor (has not been run, therefore no stdout or stderr)</code>
-     <stdout status="not_run"/>
-     <stderr status="not_run"/>
+     <stdout status="stale_or_not_run"/>
+     <stderr status="stale_or_not_run"/>
    </message>
    ```
 

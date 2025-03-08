@@ -87,8 +87,8 @@ Updated PlaydoMessage:
    <message>
      <text>User's message content</text>
      <code>Python code from editor</code>
-     <stdout status="not_run" />
-     <stderr status="not_run" />
+     <stdout status="stale_or_not_run" />
+     <stderr status="stale_or_not_run" />
    </message>
    ```
    - Empty or null output fields should use the empty element with status attribute

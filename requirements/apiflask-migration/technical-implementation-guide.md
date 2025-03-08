@@ -100,7 +100,7 @@ class PlaydoContent:
 Convert the `PlaydoMessage` model:
 
 - Ensure all fields and methods are preserved
-- Pay special attention to the XML conversion methods and the fields (like `status="not_run"` etc) to preserve this xml structure.
+- Pay special attention to the XML conversion methods and the fields (like `status="stale_or_not_run"` etc) to preserve this xml structure.
 - Maintain compatibility with Anthropic message formats
 
 #### 2.4 Convert ConversationHistory Model
