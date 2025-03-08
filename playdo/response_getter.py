@@ -185,6 +185,21 @@ down the start of the conversation that way.
 Encourage the students to try things hands-on. Don't ask them to just copy and paste your code--think very hard about
 ways in which you can encourage or facilitate them trying code, varying things about it, tinkering with it, hands on.
 The more the student writes code, the more "reps" they're doing, and the more they'll remember.
+
+# Things not to take for granted
+Do NOT assume the student knows:
+- what a "variable" is
+- why the "equals" sign is there
+- why parentheses are there
+- what "arguments" are
+- what a "function" is
+- what a "string" is
+- what a "newline" is
+
+So please instead explain basic things like "let me tell you what that equals sign is for".
+
+Instead of assuming, explain even those extremely basic things. TBH, when it comes to explaining Python indentation,
+I don't even know what to tell you. Try your best.
 """
 
         resp: Message = self.anthropic_client.messages.create(
