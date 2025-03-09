@@ -495,16 +495,20 @@ wheels = [
 [[package]]
 name = "playdo"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
     { name = "flask" },
+    { name = "pydantic" },
+    { name = "requests" },
+]
+
+[package.dev-dependencies]
+dev = [
     { name = "ipdb" },
     { name = "mypy" },
     { name = "pre-commit" },
-    { name = "pydantic" },
     { name = "pytest" },
-    { name = "requests" },
     { name = "ruff" },
 ]
 
@@ -512,12 +516,16 @@ dependencies = [
 requires-dist = [
     { name = "anthropic", specifier = ">=0.46.0" },
     { name = "flask", specifier = ">=3.1.0" },
+    { name = "pydantic", specifier = ">=2.10.6" },
+    { name = "requests", specifier = ">=2.32.3" },
+]
+
+[package.metadata.requires-dev]
+dev = [
     { name = "ipdb", specifier = ">=0.13.13" },
     { name = "mypy", specifier = ">=1.15.0" },
     { name = "pre-commit", specifier = ">=4.1.0" },
-    { name = "pydantic", specifier = ">=2.10.6" },
     { name = "pytest", specifier = ">=8.3.4" },
-    { name = "requests", specifier = ">=2.32.3" },
     { name = "ruff", specifier = ">=0.9.8" },
 ]
 

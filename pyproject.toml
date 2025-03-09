@@ -7,14 +7,30 @@ requires-python = ">=3.12"
 dependencies = [
     "anthropic>=0.46.0",
     "flask>=3.1.0",
-    "ipdb>=0.13.13",
-    "mypy>=1.15.0",
-    "pre-commit>=4.1.0",
     "pydantic>=2.10.6",
-    "pytest>=8.3.4",
     "requests>=2.32.3",
-    "ruff>=0.9.8",
 ]
+
+[dependency-groups]
+dev = [
+    "ipdb>=0.13.13",
+    "pre-commit>=4.1.0",
+    "ruff>=0.9.8",
+    "pytest>=8.3.4",
+    "mypy>=1.15.0",
+]
+
+[project.scripts]
+playdo-api = "playdo.app:main"
+playdo-cli = "playdo.cli.cli_app:main"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["playdo*"]
 
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.
