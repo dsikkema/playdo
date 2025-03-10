@@ -1,3 +1,16 @@
+-- Before conversation:
+
+Do you have any clarifying questions or suggestions? I do not know everything, so please provide information that "fills in the gaps" in my knowledge if it is evident
+that I have omitted something important (which I may have omitted because I do not know that it exists). I want to grow my understanding, so I will also be grateful
+if you PUSH BACK on faulty assumptions or misguided ideas I may have - correct and inform me please, if that's the case. Pushback is good.
+
+-- During conversation:
+
+Don't jump into writing code - do you have any more clarifying questions, suggestions, or guidance before we begin? It's good for you to develop a detailed understaning
+of requirements.
+
+-- After conversation:
+
 Based on the conversation above, write a technical specification that has guidance for how to implement what we have discussed.
 
 The output you now give will be used as the requirements guide for AI developers to implement these features. They already know the existing code base, so they will be tasked with the specifics of integrating the changes, and you should not write too much prescriptive code. Be declarative about what the resulting logic and flow should be, be declarative about the models that will be used. But leave nothing important out that we've discussed, while remembering this is an MVP focus.
