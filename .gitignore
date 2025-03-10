@@ -12,3 +12,4 @@ wheels/
 data/
 .env
 .docker.env
+.DS_Store
