@@ -10,7 +10,7 @@ import xml.dom.minidom
 import datetime
 import re
 
-from pydantic import BaseModel, EmailStr, validator
+from pydantic import BaseModel, EmailStr, field_validator, ConfigDict
 
 
 class PlaydoContent(BaseModel):
@@ -132,7 +132,8 @@ class User(BaseModel):
     created_at: Optional[datetime.datetime] = None
     updated_at: Optional[datetime.datetime] = None
 
-    @validator("username")
+    @field_validator("username")
+    @classmethod
     def username_must_be_valid(cls, v):
         if len(v) < 4:
             raise ValueError("Username must be at least 4 characters")
@@ -140,9 +141,8 @@ class User(BaseModel):
             raise ValueError("Username may contain only alphanumeric characters and underscores")
         return v
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
     def to_dict_for_display(self) -> Dict[str, Any]:
         """Return a dictionary suitable for display (excluding sensitive fields)"""
-        return self.dict(exclude={"password_hash", "password_salt"})
+        return self.model_dump(exclude={"password_hash", "password_salt"})
