@@ -10,6 +10,7 @@ from pathlib import Path
 from flask import Flask
 
 from playdo.conversation_repository import ConversationRepository, conversation_repository
+from playdo.user_repository import UserRepository, user_repository
 from playdo.settings import settings
 
 
@@ -18,4 +19,10 @@ class PlaydoApp(Flask):
     def conversation_repository(self) -> Generator[ConversationRepository, None, None]:
         db_path = Path(settings.DATABASE_PATH)
         with conversation_repository(db_path) as repository:
+            yield repository
+
+    @contextmanager
+    def user_repository(self) -> Generator[UserRepository, None, None]:
+        db_path = Path(settings.DATABASE_PATH)
+        with user_repository(db_path) as repository:
             yield repository

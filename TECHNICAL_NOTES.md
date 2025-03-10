@@ -21,13 +21,15 @@ The Playdo backend consists of several key components:
 
 2. **ConversationRepository** - Manages database operations for storing and retrieving conversations and messages in SQLite.
 
-3. **ResponseGetter** - Interfaces with the Anthropic Claude API to generate AI responses for user messages.
+3. **UserRepository** - Manages database operations for user authentication and management in SQLite.
 
-4. **Models** - Pydantic data models that represent conversations, messages, and content blocks, ensuring type safety across the application.
+4. **ResponseGetter** - Interfaces with the Anthropic Claude API to generate AI responses for user messages.
 
-5. **Settings** - Configuration management via environment variables, making the application configurable across different environments.
+5. **Models** - Pydantic data models that represent conversations, messages, content blocks, and users, ensuring type safety across the application.
 
-6. **CLI Interface** - A command-line interface for interacting with the application, useful for testing and development.
+6. **Settings** - Configuration management via environment variables, making the application configurable across different environments.
+
+7. **CLI Interface** - A command-line interface for interacting with the application, useful for testing and development.
 
 ## Main Application Structure
 
@@ -38,10 +40,12 @@ Playdo follows a modular architecture
 - **endpoints/** - Contains API route definitions organized by domain (conversations).
 - **models.py** - Data models for the application using Pydantic.
 - **conversation_repository.py** - Database operations for conversations.
+- **user_repository.py** - Database operations for user management.
 - **response_getter.py** - Anthropic Claude API integration.
 - **settings.py** - Application configuration via environment variables.
 - **db.py** - Database connection management.
 - **cli/** - Command-line interface for the application.
+  - **user_cli.py** - CLI tool for user management.
 
 ## File Structure
 
@@ -53,8 +57,10 @@ playdo
 ├── cli
 │   ├── __init__.py
 │   ├── cli_app.py                 # CLI application entry point
-│   └── historical_conversation.py # Interactive CLI conversation
+│   ├── historical_conversation.py # Interactive CLI conversation
+│   └── user_cli.py                # User management CLI
 ├── conversation_repository.py     # Database operations for conversations
+├── user_repository.py             # Database operations for users
 ├── db.py                          # Database utilities
 ├── endpoints
 │   └── conversations.py           # API endpoints for conversations
@@ -81,6 +87,7 @@ run.sh                             # Script to run the web application
 sanity_test.py                     # Basic smoke tests
 schema.sql                         # Database schema
 tests/                             # Test suite
+user_cli.sh                        # Script to run the user management CLI
 uv.lock                            # Dependency lock file
 ```
 
@@ -157,6 +164,47 @@ Playdo integrates the code editor with the chat interface, allowing the AI tutor
 
 6. **Efficiency** - The XML representation is designed to be token-efficient, using status attributes to indicate when code hasn't been run rather than including redundant explanations.
 
+## User Management System
+
+The Playdo application includes a user management system for authentication and authorization:
+
+1. **User Model** - The User model includes:
+   - `id`: Unique identifier for the user
+   - `username`: Unique username (alphanumeric and underscores only)
+   - `email`: Unique email address (case-insensitive)
+   - `password_hash`: Argon2 hash of the user's password
+   - `password_salt`: Unique salt for password hashing
+   - `is_admin`: Boolean flag for admin privileges
+   - `created_at` and `updated_at`: Timestamps for user creation and updates
+
+2. **UserRepository** - This component manages database operations for users:
+   - Create, read, update, and delete operations for users
+   - Password hashing and verification using Argon2
+   - Case-insensitive email uniqueness validation
+   - Username uniqueness validation
+
+3. **CLI Tool** - A command-line interface for user management:
+   - Create users with secure password handling
+   - List all users
+   - Get user details by ID, username, or email
+   - Update user details (username, email, password, admin status)
+   - Delete users
+   - Automatic backup of user data before destructive operations
+   - Logging of all user management operations
+
+4. **Security Features**:
+   - Passwords are never stored in plain text
+   - Each user has a unique salt for password hashing
+   - Argon2 is used for secure password hashing
+   - Password validation ensures strong passwords (12+ characters, mix of letters and numbers)
+   - Confirmation required for destructive operations (admin creation, admin status change, deletion)
+
+5. **Usage**:
+   - The CLI tool is accessible via the `user_cli.sh` script
+   - Commands: create, list, get, update, delete
+   - Example: `./user_cli.sh create --username johndoe --email john@example.com`
+   - Example: `./user_cli.sh update --id 1 --username newname --email new@example.com --password --admin true`
+
 ## Key Design Principles
 
 Playdo follows several key design principles:
@@ -173,13 +221,15 @@ Playdo follows several key design principles:
 
 6. **Seamless Context Sharing** - The system automatically ensures the AI tutor has the context it needs without the student having to think about it.
 
+7. **Secure Authentication** - User authentication is handled securely with proper password hashing and validation.
+
 ## Technical Dependencies
 
 The Playdo backend relies on several key technologies:
 
 1. **Flask** - Web framework for the API.
 
-2. **SQLite** - Lightweight database for storing conversations.
+2. **SQLite** - Lightweight database for storing conversations and user data.
 
 3. **Pydantic** - Data validation and settings management.
 
@@ -192,6 +242,10 @@ The Playdo backend relies on several key technologies:
 7. **Mypy** - Static type checker for Python.
 
 8. **Pytest** - Testing framework for Python.
+
+9. **Argon2** - Secure password hashing algorithm.
+
+10. **Click** - Command-line interface toolkit.
 
 ## Cursor Rules Reminders:
 There are rules in the context window. They contain instructions for the AI writing code about how to properly design tests and verify functionality with

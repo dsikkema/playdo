@@ -13,3 +13,5 @@ data/
 .env
 .docker.env
 .DS_Store
+logs/
+backups/
