@@ -9,7 +9,7 @@ import sqlite3
 import secrets
 from contextlib import contextmanager
 from datetime import datetime
-from typing import List, Optional, Dict, Any, Tuple, Generator, Union
+from typing import List, Optional, Tuple, Generator, Union
 from pathlib import Path
 
 from argon2 import PasswordHasher
@@ -21,6 +21,18 @@ logger = logging.getLogger("playdo")
 
 # Type alias for parameters to SQLite query
 SQLiteParam = Union[str, int, float, None]
+
+
+class UserAlreadyExistsError(Exception):
+    """Exception raised when a user already exists in the database."""
+
+    pass
+
+
+class UserNotFoundError(Exception):
+    """Exception raised when a user is not found in the database."""
+
+    pass
 
 
 class UserRepository:
@@ -43,40 +55,24 @@ class UserRepository:
         finally:
             connection.close()
 
-    def _check_unique_constraints(
-        self, conn: sqlite3.Connection, username: Optional[str], email: Optional[str], exclude_id: Optional[int] = None
-    ) -> Optional[str]:
+    def username_already_exists(self, username: str) -> bool:
+        """Check if a username already exists in the database."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM user WHERE username = ?", (username,))
+            return cursor.fetchone() is not None
+
+    def email_already_exists(self, conn: sqlite3.Connection, email: str) -> bool:
         """
-        Check if username or email already exist in the database.
-        Returns an error message if constraints are violated, None otherwise.
+        Check if email already exists in the database.
         """
         cursor = conn.cursor()
         # Convert email to lowercase for case-insensitive comparison
         email_lower = email.lower() if email else None
 
-        # Check username uniqueness
-        if username:
-            if exclude_id is not None:
-                cursor.execute("SELECT id, username FROM user WHERE username = ? AND id != ?", (username, exclude_id))
-            else:
-                cursor.execute("SELECT id, username FROM user WHERE username = ?", (username,))
-
-            existing_user = cursor.fetchone()
-            if existing_user:
-                return f"Username '{username}' already exists"
-
         # Check email uniqueness
-        if email_lower:
-            if exclude_id is not None:
-                cursor.execute("SELECT id, email FROM user WHERE LOWER(email) = LOWER(?) AND id != ?", (email_lower, exclude_id))
-            else:
-                cursor.execute("SELECT id, email FROM user WHERE LOWER(email) = LOWER(?)", (email_lower,))
-
-            existing_email = cursor.fetchone()
-            if existing_email:
-                return f"Email '{email}' already exists"
-
-        return None
+        cursor.execute("SELECT id, email FROM user WHERE LOWER(email) = LOWER(?)", (email_lower,))
+        return cursor.fetchone() is not None
 
     def _convert_row_to_user(self, row: sqlite3.Row) -> User:
         """Convert a database row to a User model instance."""
@@ -92,53 +88,37 @@ class UserRepository:
             updated_at=datetime.fromisoformat(row["updated_at"]),
         )
 
-    def create_user(
-        self, username: str, email: str, password_hash: str, password_salt: str, is_admin: bool = False
-    ) -> Tuple[Optional[User], Optional[str]]:
+    def create_user(self, username: str, email: str, password_hash: str, password_salt: str, is_admin: bool = False) -> User:
         """
         Create a new user and return the created user with ID and timestamps.
-        Returns a tuple of (user, error_message) where:
-        - If successful: (User, None)
-        - If failed: (None, error_message)
+
+        Return the created user or raise an exception if the user already exists.
         """
         # Normalize email to lowercase
         email = email.lower()
+        if self.username_already_exists(username):
+            raise UserAlreadyExistsError(f"Username '{username}' already exists")
+        if self.email_already_exists(email):
+            raise UserAlreadyExistsError(f"Email '{email}' already exists")
 
         with self.get_connection() as conn:
-            # Check uniqueness constraints
-            error = self._check_unique_constraints(conn, username, email)
-            if error:
-                return None, error
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO user (username, email, password_hash, password_salt, is_admin)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (username, email, password_hash, password_salt, 1 if is_admin else 0),
+            )
+            conn.commit()
 
-            try:
-                cursor = conn.cursor()
-                cursor.execute(
-                    """
-                    INSERT INTO user (username, email, password_hash, password_salt, is_admin)
-                    VALUES (?, ?, ?, ?, ?)
-                    """,
-                    (username, email, password_hash, password_salt, 1 if is_admin else 0),
-                )
-                conn.commit()
-
-                # Get the created user with all fields
-                user_id = cursor.lastrowid
-                assert user_id is not None, "Failed to get lastrowid after insert"
-                user = self.get_user_by_id(user_id)
-                return user, None
-            except sqlite3.IntegrityError as e:
-                # Handle specific integrity errors
-                if "UNIQUE constraint failed: user.username" in str(e):
-                    return None, f"Username '{username}' already exists"
-                elif "UNIQUE constraint failed: user.email" in str(e):
-                    return None, f"Email '{email}' already exists"
-                else:
-                    return None, f"Database integrity error: {str(e)}"
-            except sqlite3.Error as e:
-                return None, f"Database error: {str(e)}"
+            # Get the created user with all fields
+            user_id = cursor.lastrowid
+            assert user_id is not None, "Failed to get lastrowid after insert"
+            return self.get_user_by_id(user_id)
 
     def get_user_by_id(self, user_id: int) -> Optional[User]:
-        """Get user by ID."""
+        """Get user by ID, return None if user does not exist."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -156,7 +136,7 @@ class UserRepository:
             return self._convert_row_to_user(row)
 
     def get_user_by_username(self, username: str) -> Optional[User]:
-        """Get user by username."""
+        """Get user by username, return None if user does not exist."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -174,7 +154,7 @@ class UserRepository:
             return self._convert_row_to_user(row)
 
     def get_user_by_email(self, email: str) -> Optional[User]:
-        """Get user by email (case-insensitive)."""
+        """Get user by email (case-insensitive), return None if user does not exist."""
         # Normalize email to lowercase
         email = email.lower()
 
@@ -195,7 +175,7 @@ class UserRepository:
             return self._convert_row_to_user(row)
 
     def list_users(self) -> List[User]:
-        """List all users."""
+        """List all users, return empty list if no users exist."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -208,12 +188,19 @@ class UserRepository:
 
             return [self._convert_row_to_user(row) for row in rows]
 
-    def update_user(self, user_id: int, updates: Dict[str, Any]) -> Tuple[Optional[User], Optional[str]]:
+    def update_user(
+        self,
+        *,
+        user_id: int,
+        username: Optional[str] = None,
+        email: Optional[str] = None,
+        is_admin: Optional[bool] = None,
+        password: Optional[str] = None,
+    ) -> Tuple[Optional[User], Optional[str]]:
         """
-        Update user fields and return the updated user.
-        Returns a tuple of (user, error_message) where:
-        - If successful: (User, None)
-        - If failed: (None, error_message)
+        Update user fields and return the updated user, or raise an exception if the user does not exist.
+
+        Password salt is set automatically, and password is taken directly and transformed into a salted hash.
         """
         # First check if user exists
         existing_user = self.get_user_by_id(user_id)
@@ -221,45 +208,42 @@ class UserRepository:
             return None, "User not found"
 
         # Build UPDATE statement dynamically based on provided fields
-        update_fields: List[str] = []
-        params: List[SQLiteParam] = []
 
         # For uniqueness checks
-        username_to_check: Optional[str] = None
-        email_to_check: Optional[str] = None
 
-        if "username" in updates and updates["username"] is not None:
-            username_to_check = str(updates["username"])
+        update_fields: List[str] = []
+        params: List[SQLiteParam] = []
+        if username is not None:
+            assert not existing_user.username == username, "Username is the same as the existing username"
+            assert not self.username_already_exists(username), "Username already exists"
             update_fields.append("username = ?")
-            params.append(username_to_check)
+            params.append(username)
 
-        if "email" in updates and updates["email"] is not None:
+        if email is not None:
             # Normalize email to lowercase
-            email_value = str(updates["email"]).lower()
-            email_to_check = email_value
+            email_lower = str(email).lower()
+            assert not existing_user.email == email_lower, "Email is the same as the existing email"
+            assert not self.email_already_exists(email_lower), "Email already exists"
             update_fields.append("email = ?")
-            params.append(email_value)
+            params.append(email_lower)
 
-        if "is_admin" in updates and updates["is_admin"] is not None:
+        if is_admin is not None:
             update_fields.append("is_admin = ?")
             # Convert Python boolean to SQLite integer (0/1)
-            params.append(1 if updates["is_admin"] else 0)
+            params.append(1 if is_admin else 0)
 
-        if "password_hash" in updates and "password_salt" in updates:
+        if password is not None:
+            password_hash, password_salt = self.hash_password(password)
             update_fields.append("password_hash = ?")
-            params.append(str(updates["password_hash"]))
+            params.append(password_hash)
             update_fields.append("password_salt = ?")
-            params.append(str(updates["password_salt"]))
+            params.append(password_salt)
 
         if not update_fields:
-            return existing_user, None  # No updates to make
+            raise ValueError("No updates to make")
 
         with self.get_connection() as conn:
             # Check uniqueness constraints if updating username or email
-            if username_to_check or email_to_check:
-                error = self._check_unique_constraints(conn, username_to_check, email_to_check, exclude_id=user_id)
-                if error:
-                    return None, error
 
             try:
                 # Add user_id to params
@@ -277,38 +261,30 @@ class UserRepository:
                 conn.commit()
 
                 if cursor.rowcount == 0:
-                    return None, "Update failed: no rows affected"
+                    raise ValueError("Update failed: no rows affected")
 
                 # Return the updated user
-                updated_user = self.get_user_by_id(user_id)
-                return updated_user, None
+                return self.get_user_by_id(user_id)
             except sqlite3.IntegrityError as e:
                 # Handle specific integrity errors
                 if "UNIQUE constraint failed: user.username" in str(e):
-                    return None, f"Username '{username_to_check}' already exists"
+                    raise UserAlreadyExistsError(f"Username '{username}' already exists")
                 elif "UNIQUE constraint failed: user.email" in str(e):
-                    return None, f"Email '{email_to_check}' already exists"
+                    raise UserAlreadyExistsError(f"Email '{email}' already exists")
                 else:
-                    return None, f"Database integrity error: {str(e)}"
-            except sqlite3.Error as e:
-                return None, f"Database error: {str(e)}"
+                    raise e
 
-    def delete_user(self, user_id: int) -> Tuple[bool, Optional[str]]:
+    def delete_user(self, user_id: int) -> None:
         """
-        Delete a user by ID.
-        Returns (success, error_message)
+        Delete a user by ID, or raise an exception if the user does not exist
         """
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM user WHERE id = ?", (user_id,))
-                conn.commit()
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM user WHERE id = ?", (user_id,))
+            conn.commit()
 
-                if cursor.rowcount == 0:
-                    return False, "User not found"
-                return True, None
-        except sqlite3.Error as e:
-            return False, f"Database error: {str(e)}"
+            if cursor.rowcount == 0:
+                raise UserNotFoundError(f"User with ID {user_id} not found")
 
     def hash_password(self, password: str) -> Tuple[str, str]:
         """Hash a password and return the hash and salt."""

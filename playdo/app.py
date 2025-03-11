@@ -1,3 +1,7 @@
+"""
+TOODO: blanket error handlers to prevent exception leakage
+"""
+
 import logging
 import os
 from typing import Optional
