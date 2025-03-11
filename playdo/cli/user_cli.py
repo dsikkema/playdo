@@ -12,11 +12,10 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any
-import sqlite3
 
 from playdo.user_repository import UserRepository
 from playdo.models import User
-from playdo.settings import Settings
+from playdo.settings import settings
 
 
 # Set up logging
@@ -26,8 +25,7 @@ def setup_logging() -> None:
     Logs are stored in logs/user_management.log.
     """
     # Create logs directory if it doesn't exist
-    logs_dir = Path("logs")
-    logs_dir.mkdir(exist_ok=True)
+    logs_dir = settings.LOGS_DIR
 
     log_file = logs_dir / "user_management.log"
 
@@ -44,8 +42,7 @@ def backup_users_table(repo: UserRepository) -> Optional[str]:
     Returns the path to the backup file or None if backup failed.
     """
     # Create backup directory if it doesn't exist
-    backup_dir = Path("backups")
-    backup_dir.mkdir(exist_ok=True)
+    backup_dir = settings.BACKUPS_DIR
 
     # Generate a timestamp for the filename
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
@@ -53,15 +50,9 @@ def backup_users_table(repo: UserRepository) -> Optional[str]:
 
     try:
         # Get all users
-        try:
-            users = repo.list_users()
-        except sqlite3.OperationalError as e:
-            if "no such table: user" in str(e):
-                # Table doesn't exist yet, nothing to backup
-                return None
-            else:
-                # Re-raise other errors
-                raise
+        users = repo.list_users()
+        users = repo.list_users()
+        users = repo.list_users()
 
         # Convert to dict for JSON serialization
         users_dict = [
@@ -84,8 +75,8 @@ def backup_users_table(repo: UserRepository) -> Optional[str]:
 
         return str(backup_file)
     except Exception as e:
-        logging.error(f"Backup failed: {str(e)}")
-        return None
+        logging.exception("Backup failed")
+        raise e
 
 
 def validate_password(password: str) -> bool:
@@ -100,7 +91,7 @@ def validate_password(password: str) -> bool:
     return True
 
 
-def get_password(confirm: bool = True) -> str:
+def get_password() -> str:
     """
     Prompt for password with confirmation.
     """
@@ -111,11 +102,10 @@ def get_password(confirm: bool = True) -> str:
             click.echo("Password must be at least 12 characters and contain both letters and numbers.")
             continue
 
-        if confirm:
-            confirm_password = getpass.getpass("Confirm password: ")
-            if password != confirm_password:
-                click.echo("Passwords do not match. Please try again.")
-                continue
+        confirm_password = getpass.getpass("Confirm password: ")
+        if password != confirm_password:
+            click.echo("Passwords do not match. Please try again.")
+            continue
 
         return password
 
@@ -125,14 +115,14 @@ def format_user_for_display(user: User) -> str:
     Format a user object for display, excluding sensitive fields.
     """
     user_dict = user.to_dict_for_display()
-    return "\n".join([f"{key}: {value}" for key, value in user_dict.items()])
+    return "\n".join(sorted([f"{key}: {value}" for key, value in user_dict.items()]))
 
 
 # CLI group
 @click.group()
-@click.option("--db-path", default=None, help="Path to the SQLite database")
+@click.option("--db-path", default=None, type=click.Path(exists=True, path_type=Path), help="Path to the SQLite database")
 @click.pass_context
-def cli(ctx, db_path):
+def cli(ctx, db_path: Optional[Path] = None):
     """
     User management tool for Playdo.
 
@@ -141,12 +131,12 @@ def cli(ctx, db_path):
     setup_logging()
 
     # Get settings
-    settings = Settings()
-    db_path = db_path or settings.DATABASE_PATH
+    if db_path is not None:
+        settings.DATABASE_PATH = str(db_path)
 
     # Create context object
     ctx.ensure_object(dict)
-    ctx.obj["repo"] = UserRepository(Path(db_path))
+    ctx.obj["repo"] = UserRepository(Path(settings.DATABASE_PATH))
     ctx.obj["logger"] = logging.getLogger("user_cli")
 
     # Log CLI invocation (excluding password data)
@@ -164,8 +154,8 @@ def create(ctx, username: str, email: str, admin: bool):
     """
     Create a new user.
     """
-    repo = ctx.obj["repo"]
-    logger = ctx.obj["logger"]
+    repo: UserRepository = ctx.obj["repo"]
+    logger: logging.Logger = ctx.obj["logger"]
 
     # Validate username (additional validation beyond what's in the model)
     if len(username) < 4:
