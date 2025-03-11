@@ -11,9 +11,9 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional
 
-from playdo.user_repository import UserRepository
+from playdo.user_repository import UserRepository, UserAlreadyExistsError, UserNotFoundError
 from playdo.models import User
 from playdo.settings import settings
 
@@ -183,23 +183,26 @@ def create(ctx, username: str, email: str, admin: bool):
     password_hash, password_salt = repo.hash_password(password)
 
     # Create user
-    user, error = repo.create_user(
-        username=username, email=email, password_hash=password_hash, password_salt=password_salt, is_admin=admin
-    )
+    try:
+        user = repo.create_user(
+            username=username, email=email, password_hash=password_hash, password_salt=password_salt, is_admin=admin
+        )
 
-    # Log activity
-    log_fields = f"username={username}, email={email}, is_admin={admin}"
+        # Log activity
+        log_fields = f"username={username}, email={email}, is_admin={admin}"
+        logger.info(f"User created: id={user.id}, {log_fields}")
 
-    if error:
-        click.echo(f"Error: {error}")
-        logger.error(f"User creation failed: {error}, fields: {log_fields}")
+        # Display created user
+        click.echo("User created successfully:")
+        click.echo(format_user_for_display(user))
+    except UserAlreadyExistsError as e:
+        click.echo(f"Error: {str(e)}")
+        logger.error(f"User creation failed: {str(e)}, fields: username={username}, email={email}, is_admin={admin}")
         return
-
-    logger.info(f"User created: id={user.id}, {log_fields}")
-
-    # Display created user
-    click.echo("User created successfully:")
-    click.echo(format_user_for_display(user))
+    except Exception as e:
+        click.echo(f"Error: {str(e)}")
+        logger.error(f"User creation failed: {str(e)}, fields: username={username}, email={email}, is_admin={admin}")
+        return
 
 
 @cli.command()
@@ -296,21 +299,10 @@ def update(ctx, id: int, username: Optional[str], email: Optional[str], password
             click.echo("Operation cancelled.")
             return
 
-    # Create updates dictionary
-    updates: Dict[str, Any] = {}
-    if username is not None:
-        updates["username"] = username
-    if email is not None:
-        updates["email"] = email
-    if admin is not None:
-        updates["is_admin"] = admin
-
     # Handle password update
+    new_password = None
     if password:
         new_password = get_password()
-        password_hash, password_salt = repo.hash_password(new_password)
-        updates["password_hash"] = password_hash
-        updates["password_salt"] = password_salt
 
     # Create backup before making changes
     backup_file = backup_users_table(repo)
@@ -318,23 +310,39 @@ def update(ctx, id: int, username: Optional[str], email: Optional[str], password
         logger.info(f"Backup created at {backup_file}")
 
     # Construct log fields for activities log
-    log_fields = ", ".join([f"{k}={v}" for k, v in updates.items() if k not in ["password_hash", "password_salt"]])
+    log_fields = []
+    if username is not None:
+        log_fields.append(f"username={username}")
+    if email is not None:
+        log_fields.append(f"email={email}")
+    if admin is not None:
+        log_fields.append(f"is_admin={admin}")
     if password:
-        log_fields += ", password=updated"
+        log_fields.append("password=updated")
+
+    log_fields_str = ", ".join(log_fields)
 
     # Update user
-    updated_user, error = repo.update_user(id, updates)
+    try:
+        updated_user = repo.update_user(user_id=id, username=username, email=email, is_admin=admin, password=new_password)
 
-    if error:
-        click.echo(f"Error: {error}")
-        logger.error(f"User update failed: {error}, user_id={id}, fields: {log_fields}")
+        logger.info(f"User updated: id={id}, {log_fields_str}")
+
+        # Display updated user
+        click.echo("User updated successfully:")
+        click.echo(format_user_for_display(updated_user))
+    except UserAlreadyExistsError as e:
+        click.echo(f"Error: {str(e)}")
+        logger.error(f"User update failed: {str(e)}, user_id={id}, fields: {log_fields_str}")
         return
-
-    logger.info(f"User updated: id={id}, {log_fields}")
-
-    # Display updated user
-    click.echo("User updated successfully:")
-    click.echo(format_user_for_display(updated_user))
+    except UserNotFoundError as e:
+        click.echo(f"Error: {str(e)}")
+        logger.error(f"User update failed: {str(e)}, user_id={id}, fields: {log_fields_str}")
+        return
+    except Exception as e:
+        click.echo(f"Error: {str(e)}")
+        logger.error(f"User update failed: {str(e)}, user_id={id}, fields: {log_fields_str}")
+        return
 
 
 @cli.command()
@@ -369,15 +377,16 @@ def delete(ctx, id: int, force: bool):
         logger.info(f"Backup created at {backup_file}")
 
     # Delete user
-    success, error = repo.delete_user(id)
-
-    if not success:
-        click.echo(f"Error: {error}")
-        logger.error(f"User deletion failed: {error}, user_id={id}")
-        return
-
-    logger.info(f"User deleted: id={id}, username={user.username}, email={user.email}")
-    click.echo("User deleted successfully.")
+    try:
+        repo.delete_user(id)
+        logger.info(f"User deleted: id={id}, username={user.username}, email={user.email}")
+        click.echo("User deleted successfully.")
+    except UserNotFoundError as e:
+        click.echo(f"Error: {str(e)}")
+        logger.error(f"User deletion failed: {str(e)}, user_id={id}")
+    except Exception as e:
+        click.echo(f"Error: {str(e)}")
+        logger.error(f"User deletion failed: {str(e)}, user_id={id}")
 
 
 if __name__ == "__main__":

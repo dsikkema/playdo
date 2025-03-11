@@ -2,7 +2,8 @@
 Tests for the UserRepository.
 """
 
-from playdo.user_repository import UserRepository
+import pytest
+from playdo.user_repository import UserRepository, UserAlreadyExistsError, UserNotFoundError
 
 
 def test_create_user(initialized_test_db_path):
@@ -14,12 +15,11 @@ def test_create_user(initialized_test_db_path):
     password_hash, password_salt = repo.hash_password("testpassword123")
 
     # Create test user
-    user, error = repo.create_user(
+    user = repo.create_user(
         username="testuser", email="test@example.com", password_hash=password_hash, password_salt=password_salt, is_admin=False
     )
 
     # Check that user was created successfully
-    assert error is None
     assert user is not None
     assert user.id is not None
     assert user.username == "testuser"
@@ -37,21 +37,19 @@ def test_create_user_username_unique(initialized_test_db_path):
     password_hash, password_salt = repo.hash_password("testpassword123")
 
     # Create first user
-    user1, error1 = repo.create_user(
+    user1 = repo.create_user(
         username="uniqueuser", email="unique1@example.com", password_hash=password_hash, password_salt=password_salt
     )
 
-    assert error1 is None
     assert user1 is not None
 
     # Try to create second user with same username
-    user2, error2 = repo.create_user(
-        username="uniqueuser", email="unique2@example.com", password_hash=password_hash, password_salt=password_salt
-    )
+    with pytest.raises(UserAlreadyExistsError) as excinfo:
+        repo.create_user(
+            username="uniqueuser", email="unique2@example.com", password_hash=password_hash, password_salt=password_salt
+        )
 
-    assert error2 is not None
-    assert "already exists" in error2
-    assert user2 is None
+    assert "already exists" in str(excinfo.value)
 
 
 def test_create_user_email_unique_case_insensitive(initialized_test_db_path):
@@ -62,21 +60,19 @@ def test_create_user_email_unique_case_insensitive(initialized_test_db_path):
     password_hash, password_salt = repo.hash_password("testpassword123")
 
     # Create first user with lowercase email
-    user1, error1 = repo.create_user(
+    user1 = repo.create_user(
         username="emailuser1", email="same@example.com", password_hash=password_hash, password_salt=password_salt
     )
 
-    assert error1 is None
     assert user1 is not None
 
     # Try to create second user with same email but different case
-    user2, error2 = repo.create_user(
-        username="emailuser2", email="SAME@example.com", password_hash=password_hash, password_salt=password_salt
-    )
+    with pytest.raises(UserAlreadyExistsError) as excinfo:
+        repo.create_user(
+            username="emailuser2", email="SAME@example.com", password_hash=password_hash, password_salt=password_salt
+        )
 
-    assert error2 is not None
-    assert "already exists" in error2
-    assert user2 is None
+    assert "already exists" in str(excinfo.value)
 
 
 def test_get_user_by_id(initialized_test_db_path):
@@ -85,7 +81,7 @@ def test_get_user_by_id(initialized_test_db_path):
 
     # Create test user
     password_hash, password_salt = repo.hash_password("testpassword123")
-    user, _ = repo.create_user(
+    user = repo.create_user(
         username="getbyiduser", email="getbyid@example.com", password_hash=password_hash, password_salt=password_salt
     )
 
@@ -104,7 +100,7 @@ def test_get_user_by_username(initialized_test_db_path):
 
     # Create test user
     password_hash, password_salt = repo.hash_password("testpassword123")
-    user, _ = repo.create_user(
+    user = repo.create_user(
         username="getbyusername", email="getbyusername@example.com", password_hash=password_hash, password_salt=password_salt
     )
 
@@ -123,7 +119,7 @@ def test_get_user_by_email_case_insensitive(initialized_test_db_path):
 
     # Create test user
     password_hash, password_salt = repo.hash_password("testpassword123")
-    user, _ = repo.create_user(
+    user = repo.create_user(
         username="getbyemail", email="getbyemail@example.com", password_hash=password_hash, password_salt=password_salt
     )
 
@@ -168,7 +164,7 @@ def test_update_user(initialized_test_db_path):
 
     # Create test user
     password_hash, password_salt = repo.hash_password("testpassword123")
-    user, _ = repo.create_user(
+    user = repo.create_user(
         username="updateuser",
         email="updateuser@example.com",
         password_hash=password_hash,
@@ -176,12 +172,9 @@ def test_update_user(initialized_test_db_path):
         is_admin=False,
     )
 
-    # Update user
-    updates = {"username": "updateduserid", "email": "updated@example.com", "is_admin": True}
+    # Update user with named parameters
+    updated_user = repo.update_user(user_id=user.id, username="updateduserid", email="updated@example.com", is_admin=True)
 
-    updated_user, error = repo.update_user(user.id, updates)
-
-    assert error is None
     assert updated_user is not None
     assert updated_user.username == "updateduserid"
     assert updated_user.email == "updated@example.com"
@@ -194,21 +187,20 @@ def test_update_user_unique_constraints(initialized_test_db_path):
 
     # Create two test users
     password_hash, password_salt = repo.hash_password("testpassword123")
-    user1, _ = repo.create_user(
+    # Create first user - variable is used to check its username
+    user1 = repo.create_user(
         username="uniqueupdate1", email="uniqueupdate1@example.com", password_hash=password_hash, password_salt=password_salt
     )
 
-    user2, _ = repo.create_user(
+    user2 = repo.create_user(
         username="uniqueupdate2", email="uniqueupdate2@example.com", password_hash=password_hash, password_salt=password_salt
     )
 
     # Try to update user2 with user1's username
-    updates = {"username": "uniqueupdate1"}
-    updated_user, error = repo.update_user(user2.id, updates)
+    with pytest.raises(UserAlreadyExistsError) as excinfo:
+        repo.update_user(user_id=user2.id, username=user1.username)
 
-    assert error is not None
-    assert "already exists" in error
-    assert updated_user is None
+    assert "already exists" in str(excinfo.value)
 
 
 def test_delete_user(initialized_test_db_path):
@@ -217,19 +209,27 @@ def test_delete_user(initialized_test_db_path):
 
     # Create test user
     password_hash, password_salt = repo.hash_password("testpassword123")
-    user, _ = repo.create_user(
+    user = repo.create_user(
         username="deleteuser", email="deleteuser@example.com", password_hash=password_hash, password_salt=password_salt
     )
 
     # Delete user
-    success, error = repo.delete_user(user.id)
-
-    assert error is None
-    assert success is True
+    repo.delete_user(user.id)
 
     # Verify user no longer exists
     deleted_user = repo.get_user_by_id(user.id)
     assert deleted_user is None
+
+
+def test_delete_user_not_found(initialized_test_db_path):
+    """Test deleting a non-existent user."""
+    repo = UserRepository(initialized_test_db_path)
+
+    # Try to delete a user that doesn't exist
+    with pytest.raises(UserNotFoundError) as excinfo:
+        repo.delete_user(999999)
+
+    assert "not found" in str(excinfo.value)
 
 
 def test_password_verification(initialized_test_db_path):
