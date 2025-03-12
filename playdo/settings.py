@@ -10,12 +10,18 @@ _PLAYDO_DATABASE_PATH_KEY = "PLAYDO_DATABASE_PATH"
 _PLAYDO_DEBUG_KEY = "PLAYDO_DEBUG"
 _PLAYDO_TESTING_KEY = "PLAYDO_TESTING"
 _PLAYDO_ANTHROPIC_MODEL_KEY = "PLAYDO_ANTHROPIC_MODEL"
+_PLAYDO_JWT_SECRET_KEY = "PLAYDO_JWT_SECRET_KEY"
 
 
 def _get_required_envvar(key: str) -> str:
     env_var = os.getenv(key)
     assert env_var is not None, f"{key} is not set"
     return env_var
+
+
+def _get_optional_envvar(key: str, default: str) -> str:
+    """Get an environment variable or return the default value."""
+    return os.getenv(key, default)
 
 
 class Settings:
@@ -40,6 +46,9 @@ class Settings:
     DEBUG = _get_required_envvar(_PLAYDO_DEBUG_KEY).lower() == "true"
     TESTING = _get_required_envvar(_PLAYDO_TESTING_KEY).lower() == "true"
     ANTHROPIC_MODEL = _get_required_envvar(_PLAYDO_ANTHROPIC_MODEL_KEY)
+    
+    # JWT settings - use a default in development, but should be overridden in production
+    JWT_SECRET_KEY = _get_optional_envvar(_PLAYDO_JWT_SECRET_KEY, "dev-jwt-secret-key")
 
     BACKEND_BASE_DIR = Path(__file__).parent.parent
     LOGS_DIR = BACKEND_BASE_DIR / "logs"

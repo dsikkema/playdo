@@ -13,9 +13,9 @@ from playdo.models import PlaydoMessage, PlaydoContent
 
 
 @pytest.fixture
-def client(test_app: PlaydoApp) -> FlaskClient:
-    """A test client for the app."""
-    return test_app.test_client()
+def client(auth_client: FlaskClient) -> FlaskClient:
+    """A test client for the app with authentication."""
+    return auth_client
 
 
 @pytest.fixture
@@ -278,3 +278,53 @@ def test_send_message_output_with_no_code(client: FlaskClient, mock_response_get
     error_data = response.get_json()
     assert "error" in error_data
     assert error_data["error"] == "Cannot provide stdout or stderr if editor_code is null"
+
+
+def test_login_successful(test_app: PlaydoApp, test_user: dict) -> None:
+    """Test successful login."""
+    client = test_app.test_client()
+    response = client.post(
+        "/api/login",
+        json={"username": test_user["username"], "password": test_user["password"]},
+        content_type="application/json"
+    )
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert "access_token" in data
+    assert isinstance(data["access_token"], str)
+    assert len(data["access_token"]) > 0
+
+
+def test_login_invalid_credentials(test_app: PlaydoApp, test_user: dict) -> None:
+    """Test login with invalid credentials."""
+    client = test_app.test_client()
+    response = client.post(
+        "/api/login",
+        json={"username": test_user["username"], "password": "wrongpassword"},
+        content_type="application/json"
+    )
+    assert response.status_code == 401
+    data = json.loads(response.data)
+    assert "error" in data
+    assert data["error"] == "Invalid credentials"
+
+
+def test_login_missing_fields(test_app: PlaydoApp) -> None:
+    """Test login with missing fields."""
+    client = test_app.test_client()
+    response = client.post(
+        "/api/login",
+        json={"username": "someuser"},
+        content_type="application/json"
+    )
+    assert response.status_code == 400
+    data = json.loads(response.data)
+    assert "error" in data
+    assert data["error"] == "Missing username or password"
+
+
+def test_unauthorized_access(test_app: PlaydoApp) -> None:
+    """Test accessing a protected endpoint without authentication."""
+    client = test_app.test_client()
+    response = client.get("/api/conversations")
+    assert response.status_code == 401

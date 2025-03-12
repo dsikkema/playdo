@@ -5,10 +5,14 @@ TOODO: blanket error handlers to prevent exception leakage
 import logging
 import os
 from typing import Optional
+from datetime import timedelta
+
+from flask_jwt_extended import JWTManager
 
 from playdo.playdo_app import PlaydoApp
 from playdo.settings import settings
 from playdo.endpoints.conversations import conversations_bp
+from playdo.endpoints.auth import auth_bp
 
 
 def create_app(database_path: Optional[str] = None, testing: bool = False) -> PlaydoApp:
@@ -21,6 +25,11 @@ def create_app(database_path: Optional[str] = None, testing: bool = False) -> Pl
     if testing:
         settings.TESTING = True
 
+    # Configure JWT authentication
+    app.config["JWT_SECRET_KEY"] = settings.JWT_SECRET_KEY
+    app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=24)  # Token expiry time
+    jwt = JWTManager(app)
+
     # do not allow API calls during automated tests
     anthropic_api_key_key = "ANTHROPIC_API_KEY"
     if not settings.TESTING:
@@ -30,6 +39,7 @@ def create_app(database_path: Optional[str] = None, testing: bool = False) -> Pl
 
     # Register blueprints
     app.register_blueprint(conversations_bp, url_prefix="/api")
+    app.register_blueprint(auth_bp, url_prefix="/api")
 
     return app
 

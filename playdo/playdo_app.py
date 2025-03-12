@@ -11,6 +11,7 @@ from flask import Flask
 
 from playdo.conversation_repository import ConversationRepository, conversation_repository
 from playdo.user_repository import UserRepository, user_repository
+from playdo.response_getter import ResponseGetter
 from playdo.settings import settings
 
 
@@ -26,3 +27,11 @@ class PlaydoApp(Flask):
         db_path = Path(settings.DATABASE_PATH)
         with user_repository(db_path) as repository:
             yield repository
+            
+    @contextmanager
+    def response_getter(self) -> Generator[ResponseGetter, None, None]:
+        response_getter = ResponseGetter()
+        try:
+            yield response_getter
+        finally:
+            pass  # No cleanup needed
