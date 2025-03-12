@@ -140,9 +140,9 @@ def cli(ctx, db_path: Optional[Path] = None):
     ctx.obj["logger"] = logging.getLogger("user_cli")
 
     # Log CLI invocation (excluding password data)
-    username = os.environ.get("USER", "unknown")
+    server_user = os.environ.get("USER", "unknown")
     command = " ".join(sys.argv)
-    logging.info(f"CLI invoked by {username}: {command}")
+    logging.info(f"CLI invoked by {server_user}: {command}")
 
 
 @cli.command()
@@ -343,6 +343,24 @@ def update(ctx, id: int, username: Optional[str], email: Optional[str], password
         click.echo(f"Error: {str(e)}")
         logger.error(f"User update failed: {str(e)}, user_id={id}, fields: {log_fields_str}")
         return
+
+
+@cli.command()
+@click.option("--id", type=int, required=True, help="User ID")
+@click.pass_context
+def dummy_login(ctx, id: int):
+    """
+    Dummy command for manually testing password verification.
+    """
+    password = getpass.getpass("Enter password: ")
+    repo: UserRepository = ctx.obj["repo"]
+    user = repo.get_user_by_id(id)
+    if not user:
+        click.echo(f"Error: User with ID {id} not found.")
+        return
+    password_hash, password_salt = repo.hash_password(password)
+    is_valid = repo.verify_password(password, user.password_hash, user.password_salt)
+    click.echo(f"Password verification result: {is_valid}")
 
 
 @cli.command()

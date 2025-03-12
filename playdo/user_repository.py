@@ -289,7 +289,10 @@ class UserRepository:
                 raise UserNotFoundError(f"User with ID {user_id} not found")
 
     def hash_password(self, password: str) -> Tuple[str, str]:
-        """Hash a password and return the hash and salt."""
+        """
+        TOOOD ugh move this out of the user repository
+        Hash a password and return the hash and salt.
+        """
         # Generate a secure random salt
         salt = secrets.token_hex(16)
         # Combine password with salt and hash

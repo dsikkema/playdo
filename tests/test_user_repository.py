@@ -25,6 +25,8 @@ def test_create_user(initialized_test_db_path):
     assert user.username == "testuser"
     assert user.email == "test@example.com"
     assert user.is_admin is False
+    assert user.password_hash is not None
+    assert user.password_salt is not None
     assert user.created_at is not None
     assert user.updated_at is not None
 
