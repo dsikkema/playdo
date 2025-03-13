@@ -12,16 +12,12 @@ def test_create_user(initialized_test_db_path):
     # Using initialized_test_db_path fixture from conftest.py
     repo = UserRepository(initialized_test_db_path)
 
-    # Hash a simple password for testing
-    password_hash, password_salt = repo.hash_password("testpassword123")
-
-    # Create test user
     user = repo.create_user(
         User(
             username="testuser",
             email="test@example.com",
-            password_hash=password_hash,
-            password_salt=password_salt,
+            password_hash="hashbrowns",
+            password_salt="salty",
             is_admin=False,
         )
     )
@@ -32,8 +28,8 @@ def test_create_user(initialized_test_db_path):
     assert user.username == "testuser"
     assert user.email == "test@example.com"
     assert user.is_admin is False
-    assert user.password_hash is not None
-    assert user.password_salt is not None
+    assert user.password_hash == "hashbrowns"
+    assert user.password_salt == "salty"
     assert user.created_at is not None
     assert user.updated_at is not None
 
@@ -42,12 +38,9 @@ def test_create_user_username_unique(initialized_test_db_path):
     """Test that usernames must be unique."""
     repo = UserRepository(initialized_test_db_path)
 
-    # Hash a simple password for testing
-    password_hash, password_salt = repo.hash_password("testpassword123")
-
     # Create first user
     user1 = repo.create_user(
-        User(username="uniqueuser", email="unique1@example.com", password_hash=password_hash, password_salt=password_salt)
+        User(username="uniqueuser", email="unique1@example.com", password_hash="hashbrowns", password_salt="salty")
     )
 
     assert user1 is not None
@@ -55,7 +48,7 @@ def test_create_user_username_unique(initialized_test_db_path):
     # Try to create second user with same username
     with pytest.raises(UserAlreadyExistsError) as excinfo:
         repo.create_user(
-            User(username="uniqueuser", email="unique2@example.com", password_hash=password_hash, password_salt=password_salt)
+            User(username="uniqueuser", email="unique2@example.com", password_hash="hashbrowns", password_salt="salty")
         )
 
     assert "already exists" in str(excinfo.value)
@@ -65,21 +58,16 @@ def test_create_user_email_unique_case_insensitive(initialized_test_db_path):
     """Test that emails must be unique, case-insensitive."""
     repo = UserRepository(initialized_test_db_path)
 
-    # Hash a simple password for testing
-    password_hash, password_salt = repo.hash_password("testpassword123")
-
     # Create first user with lowercase email
     user1 = repo.create_user(
-        User(username="emailuser1", email="same@example.com", password_hash=password_hash, password_salt=password_salt)
+        User(username="emailuser1", email="same@example.com", password_hash="hashbrowns", password_salt="salty")
     )
 
     assert user1 is not None
 
     # Try to create second user with same email but different case
     with pytest.raises(UserAlreadyExistsError) as excinfo:
-        repo.create_user(
-            User(username="emailuser2", email="SAME@example.com", password_hash=password_hash, password_salt=password_salt)
-        )
+        repo.create_user(User(username="emailuser2", email="SAME@example.com", password_hash="hashbrowns", password_salt="salty"))
 
     assert "already exists" in str(excinfo.value)
 
@@ -89,9 +77,8 @@ def test_get_user_by_id(initialized_test_db_path):
     repo = UserRepository(initialized_test_db_path)
 
     # Create test user
-    password_hash, password_salt = repo.hash_password("testpassword123")
     user = repo.create_user(
-        User(username="getbyiduser", email="getbyid@example.com", password_hash=password_hash, password_salt=password_salt)
+        User(username="getbyiduser", email="getbyid@example.com", password_hash="hashbrowns", password_salt="salty")
     )
 
     # Get user by ID
@@ -108,11 +95,8 @@ def test_get_user_by_username(initialized_test_db_path):
     repo = UserRepository(initialized_test_db_path)
 
     # Create test user
-    password_hash, password_salt = repo.hash_password("testpassword123")
     user = repo.create_user(
-        User(
-            username="getbyusername", email="getbyusername@example.com", password_hash=password_hash, password_salt=password_salt
-        )
+        User(username="getbyusername", email="getbyusername@example.com", password_hash="hashbrowns", password_salt="salty")
     )
 
     # Get user by username
@@ -129,9 +113,8 @@ def test_get_user_by_email_case_insensitive(initialized_test_db_path):
     repo = UserRepository(initialized_test_db_path)
 
     # Create test user
-    password_hash, password_salt = repo.hash_password("testpassword123")
     user = repo.create_user(
-        User(username="getbyemail", email="getbyemail@example.com", password_hash=password_hash, password_salt=password_salt)
+        User(username="getbyemail", email="getbyemail@example.com", password_hash="hashbrowns", password_salt="salty")
     )
 
     # Get user by email, different case
@@ -148,14 +131,9 @@ def test_list_users(initialized_test_db_path):
     repo = UserRepository(initialized_test_db_path)
 
     # Create two test users
-    password_hash, password_salt = repo.hash_password("testpassword123")
-    repo.create_user(
-        User(username="listuser1", email="listuser1@example.com", password_hash=password_hash, password_salt=password_salt)
-    )
+    repo.create_user(User(username="listuser1", email="listuser1@example.com", password_hash="hashbrowns", password_salt="salty"))
 
-    repo.create_user(
-        User(username="listuser2", email="listuser2@example.com", password_hash=password_hash, password_salt=password_salt)
-    )
+    repo.create_user(User(username="listuser2", email="listuser2@example.com", password_hash="hashbrowns", password_salt="salty"))
 
     # List all users
     users = repo.list_users()
@@ -174,13 +152,12 @@ def test_update_user(initialized_test_db_path):
     repo = UserRepository(initialized_test_db_path)
 
     # Create test user
-    password_hash, password_salt = repo.hash_password("testpassword123")
     user = repo.create_user(
         User(
             username="updateuser",
             email="updateuser@example.com",
-            password_hash=password_hash,
-            password_salt=password_salt,
+            password_hash="hashbrowns",
+            password_salt="salty",
             is_admin=False,
         )
     )
@@ -202,18 +179,13 @@ def test_update_user_unique_constraints(initialized_test_db_path):
     repo = UserRepository(initialized_test_db_path)
 
     # Create two test users
-    password_hash, password_salt = repo.hash_password("testpassword123")
     # Create first user - variable is used to check its username
     user1 = repo.create_user(
-        User(
-            username="uniqueupdate1", email="uniqueupdate1@example.com", password_hash=password_hash, password_salt=password_salt
-        )
+        User(username="uniqueupdate1", email="uniqueupdate1@example.com", password_hash="hashbrowns", password_salt="salty")
     )
 
     user2 = repo.create_user(
-        User(
-            username="uniqueupdate2", email="uniqueupdate2@example.com", password_hash=password_hash, password_salt=password_salt
-        )
+        User(username="uniqueupdate2", email="uniqueupdate2@example.com", password_hash="hashbrowns", password_salt="salty")
     )
 
     # Try to update user2 with user1's username
@@ -229,9 +201,8 @@ def test_delete_user(initialized_test_db_path):
     repo = UserRepository(initialized_test_db_path)
 
     # Create test user
-    password_hash, password_salt = repo.hash_password("testpassword123")
     user = repo.create_user(
-        User(username="deleteuser", email="deleteuser@example.com", password_hash=password_hash, password_salt=password_salt)
+        User(username="deleteuser", email="deleteuser@example.com", password_hash="hashbrowns", password_salt="salty")
     )
 
     # Delete user
@@ -251,18 +222,3 @@ def test_delete_user_not_found(initialized_test_db_path):
         repo.delete_user(999999)
 
     assert "not found" in str(excinfo.value)
-
-
-def test_password_verification(initialized_test_db_path):
-    """Test password hashing and verification."""
-    repo = UserRepository(initialized_test_db_path)
-
-    # Hash a password
-    test_password = "MySecurePassword123"
-    password_hash, password_salt = repo.hash_password(test_password)
-
-    # Verify correct password
-    assert repo.verify_password(test_password, password_hash, password_salt) is True
-
-    # Verify incorrect password
-    assert repo.verify_password("WrongPassword123", password_hash, password_salt) is False

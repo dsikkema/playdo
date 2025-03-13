@@ -52,18 +52,12 @@ def login() -> ResponseReturnValue:
         return jsonify({"error": "Missing username or password"}), 400
 
     app = get_app()
-    with app.user_repository() as repo:
-        # Get user by username
-        user = repo.get_user_by_username(username)
+    with app.auth_service() as auth_service:
+        # Validate credentials and get user
+        user = auth_service.login_user(username, password)
 
         if not user:
             # For security reasons, don't disclose whether username exists
-            return jsonify({"error": "Invalid credentials"}), 401
-
-        # Verify password
-        is_valid = repo.verify_password(password, user.password_hash, user.password_salt)
-
-        if not is_valid:
             return jsonify({"error": "Invalid credentials"}), 401
 
         # Create access token

@@ -6,14 +6,11 @@ The user table is defined in schema.sql.
 
 import logging
 import sqlite3
-import secrets
 from contextlib import contextmanager
 from datetime import datetime
-from typing import List, Optional, Tuple, Generator, Union
+from typing import List, Optional, Generator, Union
 from pathlib import Path
 
-from argon2 import PasswordHasher
-from argon2.exceptions import VerifyMismatchError
 
 from playdo.models import User
 
@@ -43,12 +40,13 @@ class UserRepository:
     def __init__(self, db_path: Path):
         assert db_path.exists(), f"Database file {db_path} does not exist"
         self.db_path = str(db_path)
-        self.password_hasher = PasswordHasher()
         self.conn = sqlite3.connect(self.db_path)
         self.conn.row_factory = sqlite3.Row
 
     def _convert_row_to_user(self, row: sqlite3.Row) -> User:
         """Convert a database row to a User model instance."""
+        # anytime we're pulling a User _out_ of the database, the id _must_ be set
+        assert row["id"] is not None, "User ID wasn't set in the database!?"
         return User(
             id=row["id"],
             username=row["username"],
@@ -217,25 +215,6 @@ class UserRepository:
 
         if cursor.rowcount == 0:
             raise UserNotFoundError(f"User with ID {user_id} not found")
-
-    def hash_password(self, password: str) -> Tuple[str, str]:
-        """
-        TOOOD ugh move this out of the user repository
-        Hash a password and return the hash and salt.
-        """
-        # Generate a secure random salt
-        salt = secrets.token_hex(16)
-        # Combine password with salt and hash
-        hash_value = self.password_hasher.hash(password + salt)
-        return hash_value, salt
-
-    def verify_password(self, password: str, stored_hash: str, stored_salt: str) -> bool:
-        """Verify a password against a stored hash and salt."""
-        try:
-            self.password_hasher.verify(stored_hash, password + stored_salt)
-            return True
-        except VerifyMismatchError:
-            return False
 
     def cleanup(self) -> None:
         self.conn.close()

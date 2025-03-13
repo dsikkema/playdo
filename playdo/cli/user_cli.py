@@ -2,6 +2,7 @@
 Command-line interface for user management.
 """
 
+from argon2 import PasswordHasher
 import click
 import getpass
 import logging
@@ -13,6 +14,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from playdo.svc.auth_service import AuthService
 from playdo.user_repository import UserRepository, UserAlreadyExistsError, UserNotFoundError, user_repository
 from playdo.models import User
 from playdo.settings import settings
@@ -162,7 +164,7 @@ def create(username: str, email: str, admin: bool):
             logger.info(f"Backup created at {backup_file}")
 
         # Hash password
-        password_hash, password_salt = repo.hash_password(password)
+        password_hash, password_salt = AuthService(repo, PasswordHasher()).hash_password(password)
 
         # Create user
         try:
@@ -305,7 +307,7 @@ def update(id: int, username: Optional[str], email: Optional[str], password: boo
             user.is_admin = admin
             log_fields.append(f"is_admin={admin}")
         if new_password:
-            password_hash, password_salt = user_repo.hash_password(new_password)
+            password_hash, password_salt = AuthService(user_repo, PasswordHasher()).hash_password(new_password)
             user.password_hash = password_hash
             user.password_salt = password_salt
             log_fields.append("password_updated=True")
@@ -343,10 +345,10 @@ def dummy_login(id: int):
     password = getpass.getpass("Enter password: ")
     with user_repository(Path(settings.DATABASE_PATH)) as repo:
         user = repo.get_user_by_id(id)
-    if not user:
-        click.echo(f"Error: User with ID {id} not found.")
-        return
-    is_valid = repo.verify_password(password, user.password_hash, user.password_salt)
+        if not user:
+            click.echo(f"Error: User with ID {id} not found.")
+            return
+        is_valid = AuthService(repo, PasswordHasher()).verify_password(password, user.password_hash, user.password_salt)
     click.echo(f"Password verification result: {is_valid}")
 
 
