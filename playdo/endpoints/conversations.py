@@ -53,75 +53,89 @@ def get_conversation(conversation_id: int) -> ResponseReturnValue:
     with app.conversation_repository() as conv_repository:
         try:
             conversation = conv_repository.get_conversation(conversation_id)
+            return jsonify(conversation.model_dump())
         except ValueError:
-            return jsonify({"error": f"Conversation with ID {conversation_id} not found"}), 404
-    return jsonify(conversation.model_dump())
+            return jsonify({"error": f"Conversation with id {conversation_id} not found"}), 404
 
 
 @conversations_bp.route("/conversations/<int:conversation_id>/send_message", methods=["POST"])
 @jwt_required()
 def send_new_message(conversation_id: int) -> ResponseReturnValue:
     """
-    Send a new message to a conversation.
+    Add a user message to a conversation and get the assistant's response.
 
-    The message can include text, code from the editor, and output from running the code.
+    The request JSON should contain:
+    - message: The user's message text (required)
+    - editor_code: The code in the editor (optional)
+    - stdout: Standard output from running the code (optional)
+    - stderr: Standard error from running the code (optional)
+
+    If editor_code is null, this means the user has not changed the code since the last time they ran it and therefore the frontend is skipping
+    sending the duplicate code, and stdout and stderr must also be null. However, if editor_code is not null, then both stdout and stderr may
+    still be null, because the user may not have run the code yet. In any case, an empty string value for editor_code, stdout, or stderr is
+    valid and completely different from a null value: it represents the code, or the output, or the error, actually being empty strings.
+
+    a null value for either stdout or stderr is valid and represents the fact that the code has not been run yet.
+
+    an empty string value for any of editor_code, stdout, or stderr is valid and completely different from null, and represents the fact that
+    the code, the output, or the error, respectively, are empty strings.
     """
     if not request.is_json:
-        return jsonify({"error": "Missing JSON in request"}), 400
+        return jsonify({"error": "Request must be JSON"}), 400
 
     data = request.get_json()
-    if not data:
-        return jsonify({"error": "Invalid JSON"}), 400
+    if not data or "message" not in data:
+        return jsonify({"error": "Missing 'message' field"}), 400
 
-    text = data.get("message", "")
-    editor_code = data.get("editor_code")
-    stdout = data.get("stdout")
-    stderr = data.get("stderr")
+    user_query = data["message"]
+    editor_code = data.get("editor_code")  # Optional
 
-    if not text:
-        return jsonify({"error": "Message text is required"}), 400
+    # If code has not run, then stdout and stderr must both be null (in xml this will be represented as
+    # `status="stale_or_not_run"`). If, on the other hand, code _has_ been run, then _both_ stdout and stderr
+    # must be provided (though they may be empty strings in case of empty output)
+    stdout = data.get("stdout")  # Optional
+    stderr = data.get("stderr")  # Optional
 
-    # Check that if editor_code is None, both stdout and stderr are also None (no code run)
-    if editor_code is None and (stdout is not None or stderr is not None):
-        return jsonify({"error": "If editor_code is null, stdout and stderr must also be null"}), 400
+    if editor_code is None:
+        if stdout is not None or stderr is not None:
+            return jsonify({"error": "Cannot provide stdout or stderr if editor_code is null"}), 400
 
-    # Both stdout and stderr must be provided together if one is provided
     if (stdout is None) != (stderr is None):
-        return jsonify({"error": "Both stdout and stderr must be provided together"}), 400
+        return jsonify(
+            {"error": "Must provide both stdout and stderr if code has been run, or neither if code has not been run"}
+        ), 400
 
-    user_message = PlaydoMessage.user_message(query=text, editor_code=editor_code, stdout=stdout, stderr=stderr)
-    try:
-        app = get_app()
+    if not user_query.strip() and not editor_code.strip() and not stdout.strip() and not stderr.strip():
+        return jsonify({"error": "Must provide at least one of: message, editor_code, stdout, stderr"}), 400
 
-        # Save the user message first
-        with app.conversation_repository() as repository:
-            try:
-                # Check if conversation exists
-                repository.get_conversation(conversation_id)
-            except ValueError:
-                return jsonify({"error": f"Conversation with ID {conversation_id} not found"}), 404
+    logger.debug(f"User message: {user_query}")
+    if editor_code is not None:
+        logger.debug(f"Editor code included (length: {len(editor_code)})")
+    if stdout is not None:
+        logger.debug(f"Stdout included (length: {len(stdout)})")
+    if stderr is not None:
+        logger.debug(f"Stderr included (length: {len(stderr)})")
 
-            # Save user message
-            repository.add_messages_to_conversation(conversation_id, [user_message])
+    app = get_app()
+    with app.conversation_repository() as conv_repository:
+        response_getter = ResponseGetter()
+        try:
+            # Create user message with code context
+            user_msg = PlaydoMessage.user_message(query=user_query, editor_code=editor_code, stdout=stdout, stderr=stderr)
+            updated_conversation = conv_repository.add_messages_to_conversation(conversation_id, [user_msg])
 
-        # Then get complete conversation history with the new user message
-        with app.conversation_repository() as repository:
-            conversation = repository.get_conversation(conversation_id)
+            # Get the assistant's response (using the existing conversation messages plus our new user message)
+            resp_message: PlaydoMessage = response_getter._get_next_assistant_resp(updated_conversation.messages)
 
-        # Get response from AI
-        with app.response_getter() as response_getter:
-            assistant_message = response_getter._get_next_assistant_resp(conversation.messages)
-
-        # Save the assistant message
-        with app.conversation_repository() as repository:
-            repository.add_messages_to_conversation(conversation_id, [assistant_message])
-
-        # Get updated conversation
-        with app.conversation_repository() as repository:
-            updated_conversation = repository.get_conversation(conversation_id)
-
-        return jsonify(updated_conversation.model_dump())
-
-    except Exception as e:
-        logger.exception("Error adding message to conversation")
-        return jsonify({"error": f"Error adding message to conversation: {str(e)}"}), 500
+            logger.debug(f"New message: {resp_message}")
+            # Save the new messages
+            updated_conversation = conv_repository.add_messages_to_conversation(conversation_id, [resp_message])
+            logger.debug(f"Updated conversation: {updated_conversation.model_dump()}")
+            # Return the updated conversation with the new messages
+            return jsonify(updated_conversation.model_dump())
+        except ValueError as e:
+            logger.exception(e)
+            return jsonify({"error": f"Conversation with id {conversation_id} not found"}), 404
+        except sqlite3.Error as e:
+            logger.exception(e)
+            return jsonify({"error": "sorry"}), 500

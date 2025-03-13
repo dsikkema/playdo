@@ -10,7 +10,7 @@ from playdo.settings import settings
 from playdo.app import create_app
 from playdo.user_repository import UserRepository
 from flask.testing import FlaskClient
-from flask_jwt_extended import create_access_token
+from werkzeug.test import TestResponse
 
 
 def pytest_configure() -> None:
@@ -53,40 +53,36 @@ def test_user(initialized_test_db_path: Path) -> dict:
     email = "test@example.com"
     password = "password12345"
     password_hash, password_salt = repo.hash_password(password)
-    
+
     user = repo.create_user(
-        username=username,
-        email=email,
-        password_hash=password_hash,
-        password_salt=password_salt,
-        is_admin=False
+        username=username, email=email, password_hash=password_hash, password_salt=password_salt, is_admin=False
     )
-    
-    return {
-        "id": user.id,
-        "username": username,
-        "email": email,
-        "password": password
-    }
+
+    return {"id": user.id, "username": username, "email": email, "password": password}
+
+
+class AuthorizedClient(FlaskClient):
+    def __init__(self, access_token: str, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.access_token = access_token
+
+    def open(self, *args, **kwargs) -> TestResponse:
+        headers = kwargs.get("headers", {})
+        headers["Authorization"] = f"Bearer {self.access_token}"
+        kwargs["headers"] = headers
+        return super().open(*args, **kwargs)
 
 
 @pytest.fixture
-def auth_client(test_app: PlaydoApp, test_user: dict) -> FlaskClient:
+def authorized_client(test_app: PlaydoApp, test_user: dict) -> AuthorizedClient:
     """A test client with JWT authentication."""
-    with test_app.app_context():
-        # Create an access token for the test user
-        access_token = create_access_token(
-            identity=test_user["id"],
-            additional_claims={
-                "username": test_user["username"],
-                "email": test_user["email"],
-                "is_admin": False
-            }
-        )
-    
-    client = test_app.test_client()
-    # Set the Authorization header for all requests
-    client.environ_base = {
-        "HTTP_AUTHORIZATION": f"Bearer {access_token}"
-    }
-    return client
+    test_client = test_app.test_client()
+    login_resp = test_client.post("/api/login", json={"username": test_user["username"], "password": test_user["password"]})
+    assert login_resp.status_code == 200
+    assert login_resp.is_json
+    data = login_resp.get_json()
+    assert data
+    assert "access_token" in data
+    assert data["access_token"] is not None
+    test_client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {data['access_token']}"
+    return test_client

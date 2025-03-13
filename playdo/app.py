@@ -9,6 +9,7 @@ from datetime import timedelta
 
 from flask_jwt_extended import JWTManager
 
+from playdo.models import User
 from playdo.playdo_app import PlaydoApp
 from playdo.settings import settings
 from playdo.endpoints.conversations import conversations_bp
@@ -40,6 +41,21 @@ def create_app(database_path: Optional[str] = None, testing: bool = False) -> Pl
     # Register blueprints
     app.register_blueprint(conversations_bp, url_prefix="/api")
     app.register_blueprint(auth_bp, url_prefix="/api")
+
+    @jwt.user_identity_loader
+    def user_identity_lookup(user: User):
+        assert user is not None, "User must not be None"
+        assert isinstance(user, User), "User must be a User"
+        return str(user.id)
+
+    @jwt.user_lookup_loader
+    def user_lookup_callback(_, jwt_data):
+        assert jwt_data is not None, "JWT data must not be None"
+        assert isinstance(jwt_data, dict), "JWT data must be a dictionary"
+        assert "sub" in jwt_data, "JWT data must contain 'sub' key"
+        assert isinstance(jwt_data["sub"], str), "JWT data 'sub' must be a string"
+        with app.user_repository() as repo:
+            return repo.get_user_by_id(int(jwt_data["sub"]))
 
     return app
 

@@ -27,7 +27,7 @@ class PlaydoApp(Flask):
         db_path = Path(settings.DATABASE_PATH)
         with user_repository(db_path) as repository:
             yield repository
-            
+
     @contextmanager
     def response_getter(self) -> Generator[ResponseGetter, None, None]:
         response_getter = ResponseGetter()

@@ -8,11 +8,9 @@ import logging
 from typing import cast
 from flask import Blueprint, jsonify, request, current_app
 from flask.typing import ResponseReturnValue
-from werkzeug.exceptions import Unauthorized
-from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required
+from flask_jwt_extended import create_access_token
 
 from playdo.playdo_app import PlaydoApp
-from playdo.models import User
 
 logger = logging.getLogger(__name__)
 
@@ -28,13 +26,13 @@ def get_app() -> PlaydoApp:
 def login() -> ResponseReturnValue:
     """
     Login endpoint to authenticate users and generate JWT tokens.
-    
+
     Expected request body:
     {
         "username": "string",
         "password": "string"
     }
-    
+
     Returns:
     {
         "access_token": "string"
@@ -57,26 +55,27 @@ def login() -> ResponseReturnValue:
     with app.user_repository() as repo:
         # Get user by username
         user = repo.get_user_by_username(username)
-        
+
         if not user:
             # For security reasons, don't disclose whether username exists
             return jsonify({"error": "Invalid credentials"}), 401
-        
+
         # Verify password
         is_valid = repo.verify_password(password, user.password_hash, user.password_salt)
-        
+
         if not is_valid:
             return jsonify({"error": "Invalid credentials"}), 401
-        
+
         # Create access token
         # Add user ID and admin status to JWT claims
         access_token = create_access_token(
-            identity=user.id,
+            # relies on app having @jwt.user_identity_loader set, which translates the User object into a subject
+            identity=user,
             additional_claims={
                 "username": user.username,
                 "email": user.email,
-                "is_admin": user.is_admin
-            }
+                "is_admin": user.is_admin,
+            },
         )
-        
-        return jsonify({"access_token": access_token}), 200 
+
+        return jsonify({"access_token": access_token}), 200
