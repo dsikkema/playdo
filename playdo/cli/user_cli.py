@@ -13,9 +13,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from playdo.user_repository import UserRepository, UserAlreadyExistsError, UserNotFoundError
+from playdo.user_repository import UserRepository, UserAlreadyExistsError, UserNotFoundError, user_repository
 from playdo.models import User
 from playdo.settings import settings
+
+logger = logging.getLogger(__name__)
 
 
 # Set up logging
@@ -50,8 +52,6 @@ def backup_users_table(repo: UserRepository) -> Optional[str]:
 
     try:
         # Get all users
-        users = repo.list_users()
-        users = repo.list_users()
         users = repo.list_users()
 
         # Convert to dict for JSON serialization
@@ -121,8 +121,7 @@ def format_user_for_display(user: User) -> str:
 # CLI group
 @click.group()
 @click.option("--db-path", default=None, type=click.Path(exists=True, path_type=Path), help="Path to the SQLite database")
-@click.pass_context
-def cli(ctx, db_path: Optional[Path] = None):
+def cli(db_path: Optional[Path] = None):
     """
     User management tool for Playdo.
 
@@ -134,11 +133,6 @@ def cli(ctx, db_path: Optional[Path] = None):
     if db_path is not None:
         settings.DATABASE_PATH = str(db_path)
 
-    # Create context object
-    ctx.ensure_object(dict)
-    ctx.obj["repo"] = UserRepository(Path(settings.DATABASE_PATH))
-    ctx.obj["logger"] = logging.getLogger("user_cli")
-
     # Log CLI invocation (excluding password data)
     server_user = os.environ.get("USER", "unknown")
     command = " ".join(sys.argv)
@@ -149,70 +143,62 @@ def cli(ctx, db_path: Optional[Path] = None):
 @click.option("--username", required=True, help="Username (min 4 characters, alphanumeric and underscores only)")
 @click.option("--email", required=True, help="Email address")
 @click.option("--admin", is_flag=True, help="Grant admin privileges")
-@click.pass_context
-def create(ctx, username: str, email: str, admin: bool):
+def create(username: str, email: str, admin: bool):
     """
     Create a new user.
     """
-    repo: UserRepository = ctx.obj["repo"]
-    logger: logging.Logger = ctx.obj["logger"]
+    with user_repository(Path(settings.DATABASE_PATH)) as repo:
+        # Validate username (additional validation beyond what's in the model)
+        if len(username) < 4:
+            click.echo("Error: Username must be at least 4 characters long.")
+            return
 
-    # Validate username (additional validation beyond what's in the model)
-    if len(username) < 4:
-        click.echo("Error: Username must be at least 4 characters long.")
-        return
+        if not re.match(r"^[a-zA-Z0-9_]+$", username):
+            click.echo("Error: Username may contain only alphanumeric characters and underscores.")
+            return
 
-    if not re.match(r"^[a-zA-Z0-9_]+$", username):
-        click.echo("Error: Username may contain only alphanumeric characters and underscores.")
-        return
+        # Get password
+        password = get_password()
 
-    # Get password
-    password = get_password()
+        # Confirm admin creation
+        if admin and not click.confirm("Are you sure you want to create an admin user?"):
+            click.echo("Operation cancelled.")
+            return
 
-    # Confirm admin creation
-    if admin and not click.confirm("Are you sure you want to create an admin user?"):
-        click.echo("Operation cancelled.")
-        return
+        # Create backup before making changes
+        backup_file = backup_users_table(repo)
+        if backup_file:
+            logger.info(f"Backup created at {backup_file}")
 
-    # Create backup before making changes
-    backup_file = backup_users_table(repo)
-    if backup_file:
-        logger.info(f"Backup created at {backup_file}")
+        # Hash password
+        password_hash, password_salt = repo.hash_password(password)
 
-    # Hash password
-    password_hash, password_salt = repo.hash_password(password)
+        # Create user
+        try:
+            user = repo.create_user(
+                username=username, email=email, password_hash=password_hash, password_salt=password_salt, is_admin=admin
+            )
 
-    # Create user
-    try:
-        user = repo.create_user(
-            username=username, email=email, password_hash=password_hash, password_salt=password_salt, is_admin=admin
-        )
+            # Log activity
+            log_fields = f"username={username}, email={email}, is_admin={admin}"
+            logger.info(f"User created: id={user.id}, {log_fields}")
 
-        # Log activity
-        log_fields = f"username={username}, email={email}, is_admin={admin}"
-        logger.info(f"User created: id={user.id}, {log_fields}")
-
-        # Display created user
-        click.echo("User created successfully:")
-        click.echo(format_user_for_display(user))
-    except UserAlreadyExistsError as e:
-        click.echo(f"Error: {str(e)}")
-        logger.error(f"User creation failed: {str(e)}, fields: username={username}, email={email}, is_admin={admin}")
-        return
-    except Exception as e:
-        click.echo(f"Error: {str(e)}")
-        logger.error(f"User creation failed: {str(e)}, fields: username={username}, email={email}, is_admin={admin}")
-        return
+            # Display created user
+            click.echo("User created successfully:")
+            click.echo(format_user_for_display(user))
+        except Exception as e:
+            click.echo(f"Error: {str(e)}")
+            logger.error(f"User creation failed: {str(e)}, fields: username={username}, email={email}, is_admin={admin}")
+            return
 
 
 @cli.command()
-@click.pass_context
-def list(ctx):
+def list():
     """
     List all users.
     """
-    repo = ctx.obj["repo"]
-    users = repo.list_users()
+    with user_repository(Path(settings.DATABASE_PATH)) as repo:
+        users = repo.list_users()
 
     if not users:
         click.echo("No users found.")
@@ -228,27 +214,25 @@ def list(ctx):
 @click.option("--id", type=int, help="User ID")
 @click.option("--username", help="Username")
 @click.option("--email", help="Email address")
-@click.pass_context
-def get(ctx, id: Optional[int], username: Optional[str], email: Optional[str]):
+def get(id: Optional[int], username: Optional[str], email: Optional[str]):
     """
     Get user details by ID, username, or email.
     """
-    repo = ctx.obj["repo"]
+    with user_repository(Path(settings.DATABASE_PATH)) as user_repo:
+        # Check that exactly one identifier is provided
+        identifiers = [i for i in [id, username, email] if i is not None]
+        if len(identifiers) != 1:
+            click.echo("Error: Please provide exactly one of: --id, --username, or --email")
+            return
 
-    # Check that exactly one identifier is provided
-    identifiers = [i for i in [id, username, email] if i is not None]
-    if len(identifiers) != 1:
-        click.echo("Error: Please provide exactly one of: --id, --username, or --email")
-        return
-
-    # Get user by the provided identifier
-    user = None
-    if id is not None:
-        user = repo.get_user_by_id(id)
-    elif username is not None:
-        user = repo.get_user_by_username(username)
-    elif email is not None:
-        user = repo.get_user_by_email(email)
+        # Get user by the provided identifier
+        user = None
+        if id is not None:
+            user = user_repo.get_user_by_id(id)
+        elif username is not None:
+            user = user_repo.get_user_by_username(username)
+        elif email is not None:
+            user = user_repo.get_user_by_email(email)
 
     if not user:
         click.echo("User not found.")
@@ -264,101 +248,91 @@ def get(ctx, id: Optional[int], username: Optional[str], email: Optional[str]):
 @click.option("--email", help="New email address")
 @click.option("--password", is_flag=True, help="Update password")
 @click.option("--admin", type=bool, help="Update admin status (True/False)")
-@click.pass_context
-def update(ctx, id: int, username: Optional[str], email: Optional[str], password: bool, admin: Optional[bool]):
+def update(id: int, username: Optional[str], email: Optional[str], password: bool, admin: Optional[bool]):
     """
     Update user details.
     """
-    repo = ctx.obj["repo"]
-    logger = ctx.obj["logger"]
 
-    # Check if at least one field is being updated
-    if username is None and email is None and not password and admin is None:
-        click.echo("Error: Please provide at least one field to update.")
-        return
-
-    # Validate username if provided
-    if username is not None and len(username) < 4:
-        click.echo("Error: Username must be at least 4 characters long.")
-        return
-
-    if username is not None and not re.match(r"^[a-zA-Z0-9_]+$", username):
-        click.echo("Error: Username may contain only alphanumeric characters and underscores.")
-        return
-
-    # Get existing user
-    existing_user = repo.get_user_by_id(id)
-    if not existing_user:
-        click.echo(f"Error: User with ID {id} not found.")
-        return
-
-    # Confirm admin status change
-    if admin is not None and admin != existing_user.is_admin:
-        action = "grant" if admin else "revoke"
-        if not click.confirm(f"Are you sure you want to {action} admin privileges for this user?"):
-            click.echo("Operation cancelled.")
+    logger = logging.getLogger(__name__)
+    with user_repository(Path(settings.DATABASE_PATH)) as user_repo:
+        # Check if at least one field is being updated
+        if username is None and email is None and not password and admin is None:
+            click.echo("Error: Please provide at least one field to update.")
             return
 
-    # Handle password update
-    new_password = None
-    if password:
-        new_password = get_password()
+        # Get existing user
+        existing_user = user_repo.get_user_by_id(id)
+        if not existing_user:
+            click.echo(f"Error: User with ID {id} not found.")
+            return
 
-    # Create backup before making changes
-    backup_file = backup_users_table(repo)
-    if backup_file:
-        logger.info(f"Backup created at {backup_file}")
+        # Confirm admin status change
+        if admin is not None and admin != existing_user.is_admin:
+            action = "grant" if admin else "revoke"
+            if not click.confirm(f"Are you sure you want to {action} admin privileges for this user?"):
+                click.echo("Operation cancelled.")
+                return
 
-    # Construct log fields for activities log
-    log_fields = []
-    if username is not None:
-        log_fields.append(f"username={username}")
-    if email is not None:
-        log_fields.append(f"email={email}")
-    if admin is not None:
-        log_fields.append(f"is_admin={admin}")
-    if password:
-        log_fields.append("password=updated")
+        # Handle password update
+        new_password = None
+        if password:
+            new_password = get_password()
 
-    log_fields_str = ", ".join(log_fields)
+        # Create backup before making changes
+        backup_file = backup_users_table(user_repo)
+        if backup_file:
+            logger.info(f"Backup created at {backup_file}")
 
-    # Update user
-    try:
-        updated_user = repo.update_user(user_id=id, username=username, email=email, is_admin=admin, password=new_password)
+        # Construct log fields for activities log
+        log_fields = []
+        if username is not None:
+            log_fields.append(f"username={username}")
+        if email is not None:
+            log_fields.append(f"email={email}")
+        if admin is not None:
+            log_fields.append(f"is_admin={admin}")
+        if password:
+            log_fields.append("password=updated")
 
-        logger.info(f"User updated: id={id}, {log_fields_str}")
+        log_fields_str = ", ".join(log_fields)
 
-        # Display updated user
-        click.echo("User updated successfully:")
-        click.echo(format_user_for_display(updated_user))
-    except UserAlreadyExistsError as e:
-        click.echo(f"Error: {str(e)}")
-        logger.error(f"User update failed: {str(e)}, user_id={id}, fields: {log_fields_str}")
-        return
-    except UserNotFoundError as e:
-        click.echo(f"Error: {str(e)}")
-        logger.error(f"User update failed: {str(e)}, user_id={id}, fields: {log_fields_str}")
-        return
-    except Exception as e:
-        click.echo(f"Error: {str(e)}")
-        logger.error(f"User update failed: {str(e)}, user_id={id}, fields: {log_fields_str}")
-        return
+        # Update user
+        try:
+            updated_user = user_repo.update_user(
+                user_id=id, username=username, email=email, is_admin=admin, password=new_password
+            )
+
+            logger.info(f"User updated: id={id}, {log_fields_str}")
+
+            # Display updated user
+            click.echo("User updated successfully:")
+            click.echo(format_user_for_display(updated_user))
+        except UserAlreadyExistsError as e:
+            click.echo(f"Error: {str(e)}")
+            logger.error(f"User update failed: {str(e)}, user_id={id}, fields: {log_fields_str}")
+            return
+        except UserNotFoundError as e:
+            click.echo(f"Error: {str(e)}")
+            logger.error(f"User update failed: {str(e)}, user_id={id}, fields: {log_fields_str}")
+            return
+        except Exception as e:
+            click.echo(f"Error: {str(e)}")
+            logger.error(f"User update failed: {str(e)}, user_id={id}, fields: {log_fields_str}")
+            return
 
 
 @cli.command()
 @click.option("--id", type=int, required=True, help="User ID")
-@click.pass_context
-def dummy_login(ctx, id: int):
+def dummy_login(id: int):
     """
     Dummy command for manually testing password verification.
     """
     password = getpass.getpass("Enter password: ")
-    repo: UserRepository = ctx.obj["repo"]
-    user = repo.get_user_by_id(id)
+    with user_repository(Path(settings.DATABASE_PATH)) as repo:
+        user = repo.get_user_by_id(id)
     if not user:
         click.echo(f"Error: User with ID {id} not found.")
         return
-    password_hash, password_salt = repo.hash_password(password)
     is_valid = repo.verify_password(password, user.password_hash, user.password_salt)
     click.echo(f"Password verification result: {is_valid}")
 
@@ -366,45 +340,42 @@ def dummy_login(ctx, id: int):
 @cli.command()
 @click.option("--id", type=int, required=True, help="User ID")
 @click.option("--force", is_flag=True, help="Skip confirmation prompt")
-@click.pass_context
-def delete(ctx, id: int, force: bool):
+def delete(id: int, force: bool):
     """
     Delete a user.
     """
-    repo = ctx.obj["repo"]
-    logger = ctx.obj["logger"]
+    with user_repository(Path(settings.DATABASE_PATH)) as repo:
+        # Get user to display details before deletion
+        user = repo.get_user_by_id(id)
+        if not user:
+            click.echo(f"Error: User with ID {id} not found.")
+            return
 
-    # Get user to display details before deletion
-    user = repo.get_user_by_id(id)
-    if not user:
-        click.echo(f"Error: User with ID {id} not found.")
-        return
+        # Display user details
+        click.echo("User to delete:")
+        click.echo(format_user_for_display(user))
 
-    # Display user details
-    click.echo("User to delete:")
-    click.echo(format_user_for_display(user))
+        # Confirm deletion
+        if not force and not click.confirm("Are you sure you want to delete this user?"):
+            click.echo("Operation cancelled.")
+            return
 
-    # Confirm deletion
-    if not force and not click.confirm("Are you sure you want to delete this user?"):
-        click.echo("Operation cancelled.")
-        return
+        # Create backup before making changes
+        backup_file = backup_users_table(repo)
+        if backup_file:
+            logger.info(f"Backup created at {backup_file}")
 
-    # Create backup before making changes
-    backup_file = backup_users_table(repo)
-    if backup_file:
-        logger.info(f"Backup created at {backup_file}")
-
-    # Delete user
-    try:
-        repo.delete_user(id)
-        logger.info(f"User deleted: id={id}, username={user.username}, email={user.email}")
-        click.echo("User deleted successfully.")
-    except UserNotFoundError as e:
-        click.echo(f"Error: {str(e)}")
-        logger.error(f"User deletion failed: {str(e)}, user_id={id}")
-    except Exception as e:
-        click.echo(f"Error: {str(e)}")
-        logger.error(f"User deletion failed: {str(e)}, user_id={id}")
+        # Delete user
+        try:
+            repo.delete_user(id)
+            logger.info(f"User deleted: id={id}, username={user.username}, email={user.email}")
+            click.echo("User deleted successfully.")
+        except UserNotFoundError as e:
+            click.echo(f"Error: {str(e)}")
+            logger.error(f"User deletion failed: {str(e)}, user_id={id}")
+        except Exception as e:
+            click.echo(f"Error: {str(e)}")
+            logger.error(f"User deletion failed: {str(e)}, user_id={id}")
 
 
 if __name__ == "__main__":
