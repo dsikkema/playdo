@@ -145,7 +145,8 @@ def cli(db_path: Optional[Path] = None):
 @click.option("--username", required=True, help="Username (min 4 characters, alphanumeric and underscores only)")
 @click.option("--email", required=True, help="Email address")
 @click.option("--admin", is_flag=True, help="Grant admin privileges")
-def create(username: str, email: str, admin: bool):
+@click.option("--force", is_flag=True, help="Skip confirmation prompt")
+def create(username: str, email: str, admin: bool, force: bool):
     """
     Create a new user.
     """
@@ -154,7 +155,7 @@ def create(username: str, email: str, admin: bool):
         password = get_password()
 
         # Confirm admin creation
-        if admin and not click.confirm("Are you sure you want to create an admin user?"):
+        if admin and not force and not click.confirm("Are you sure you want to create an admin user?"):
             click.echo("Operation cancelled.")
             return
 
@@ -241,7 +242,8 @@ def get(id: Optional[int], username: Optional[str], email: Optional[str]):
 @click.option("--email", help="New email address")
 @click.option("--password", is_flag=True, help="Update password")
 @click.option("--admin", type=bool, help="Update admin status (True/False)")
-def update(id: int, username: Optional[str], email: Optional[str], password: bool, admin: Optional[bool]):
+@click.option("--force", is_flag=True, help="Skip confirmation prompt")
+def update(id: int, username: Optional[str], email: Optional[str], password: bool, admin: Optional[bool], force: bool):
     """
     Update user details.
     """
@@ -281,7 +283,7 @@ def update(id: int, username: Optional[str], email: Optional[str], password: boo
         # Confirm admin status change
         if admin is not None and admin != user.is_admin:
             action = "grant" if admin else "revoke"
-            if not click.confirm(f"Are you sure you want to {action} admin privileges for this user?"):
+            if not force and not click.confirm(f"Are you sure you want to {action} admin privileges for this user?"):
                 click.echo("Operation cancelled.")
                 return
 
