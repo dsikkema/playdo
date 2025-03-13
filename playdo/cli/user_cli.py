@@ -148,15 +148,6 @@ def create(username: str, email: str, admin: bool):
     Create a new user.
     """
     with user_repository(Path(settings.DATABASE_PATH)) as repo:
-        # Validate username (additional validation beyond what's in the model)
-        if len(username) < 4:
-            click.echo("Error: Username must be at least 4 characters long.")
-            return
-
-        if not re.match(r"^[a-zA-Z0-9_]+$", username):
-            click.echo("Error: Username may contain only alphanumeric characters and underscores.")
-            return
-
         # Get password
         password = get_password()
 
@@ -176,7 +167,7 @@ def create(username: str, email: str, admin: bool):
         # Create user
         try:
             user = repo.create_user(
-                username=username, email=email, password_hash=password_hash, password_salt=password_salt, is_admin=admin
+                User(username=username, email=email, password_hash=password_hash, password_salt=password_salt, is_admin=admin)
             )
 
             # Log activity
@@ -243,7 +234,7 @@ def get(id: Optional[int], username: Optional[str], email: Optional[str]):
 
 
 @cli.command()
-@click.option("--id", type=int, required=True, help="User ID")
+@click.option("--id", type=int, required=True, help="ID of the user to update")
 @click.option("--username", help="New username")
 @click.option("--email", help="New email address")
 @click.option("--password", is_flag=True, help="Update password")
@@ -253,7 +244,6 @@ def update(id: int, username: Optional[str], email: Optional[str], password: boo
     Update user details.
     """
 
-    logger = logging.getLogger(__name__)
     with user_repository(Path(settings.DATABASE_PATH)) as user_repo:
         # Check if at least one field is being updated
         if username is None and email is None and not password and admin is None:
@@ -261,13 +251,33 @@ def update(id: int, username: Optional[str], email: Optional[str], password: boo
             return
 
         # Get existing user
-        existing_user = user_repo.get_user_by_id(id)
-        if not existing_user:
+        user = user_repo.get_user_by_id(id)
+        if not user:
             click.echo(f"Error: User with ID {id} not found.")
             return
 
+        if email:
+            user_with_email = user_repo.get_user_by_email(email)
+            if user_with_email:
+                if user_with_email.id != id:
+                    click.echo(f"Error: another user with email {email} already exists.")
+                    return
+                else:
+                    click.error("Email is the same as existing value.")
+                    return
+
+        if username:
+            user_with_username = user_repo.get_user_by_username(username)
+            if user_with_username:
+                if user_with_username.id != id:
+                    click.echo(f"Error: another user with username {username} already exists.")
+                    return
+                else:
+                    click.error("Username is the same as existing value.")
+                    return
+
         # Confirm admin status change
-        if admin is not None and admin != existing_user.is_admin:
+        if admin is not None and admin != user.is_admin:
             action = "grant" if admin else "revoke"
             if not click.confirm(f"Are you sure you want to {action} admin privileges for this user?"):
                 click.echo("Operation cancelled.")
@@ -283,25 +293,28 @@ def update(id: int, username: Optional[str], email: Optional[str], password: boo
         if backup_file:
             logger.info(f"Backup created at {backup_file}")
 
-        # Construct log fields for activities log
+        # Update the user object before saving it
         log_fields = []
         if username is not None:
+            user.username = username
             log_fields.append(f"username={username}")
         if email is not None:
+            user.email = email
             log_fields.append(f"email={email}")
         if admin is not None:
+            user.is_admin = admin
             log_fields.append(f"is_admin={admin}")
-        if password:
-            log_fields.append("password=updated")
+        if new_password:
+            password_hash, password_salt = user_repo.hash_password(new_password)
+            user.password_hash = password_hash
+            user.password_salt = password_salt
+            log_fields.append("password_updated=True")
 
         log_fields_str = ", ".join(log_fields)
 
         # Update user
         try:
-            updated_user = user_repo.update_user(
-                user_id=id, username=username, email=email, is_admin=admin, password=new_password
-            )
-
+            updated_user = user_repo.update_user(user)
             logger.info(f"User updated: id={id}, {log_fields_str}")
 
             # Display updated user

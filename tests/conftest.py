@@ -5,12 +5,12 @@ from pathlib import Path
 import pytest
 import sqlite3
 
+from playdo.models import User
 from playdo.playdo_app import PlaydoApp
 from playdo.settings import settings
 from playdo.app import create_app
 from playdo.user_repository import UserRepository
 from flask.testing import FlaskClient
-from werkzeug.test import TestResponse
 
 
 def pytest_configure() -> None:
@@ -55,26 +55,14 @@ def test_user(initialized_test_db_path: Path) -> dict:
     password_hash, password_salt = repo.hash_password(password)
 
     user = repo.create_user(
-        username=username, email=email, password_hash=password_hash, password_salt=password_salt, is_admin=False
+        User(username=username, email=email, password_hash=password_hash, password_salt=password_salt, is_admin=False)
     )
 
     return {"id": user.id, "username": username, "email": email, "password": password}
 
 
-class AuthorizedClient(FlaskClient):
-    def __init__(self, access_token: str, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.access_token = access_token
-
-    def open(self, *args, **kwargs) -> TestResponse:
-        headers = kwargs.get("headers", {})
-        headers["Authorization"] = f"Bearer {self.access_token}"
-        kwargs["headers"] = headers
-        return super().open(*args, **kwargs)
-
-
 @pytest.fixture
-def authorized_client(test_app: PlaydoApp, test_user: dict) -> AuthorizedClient:
+def authorized_client(test_app: PlaydoApp, test_user: dict) -> FlaskClient:
     """A test client with JWT authentication."""
     test_client = test_app.test_client()
     login_resp = test_client.post("/api/login", json={"username": test_user["username"], "password": test_user["password"]})

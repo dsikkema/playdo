@@ -6,7 +6,7 @@ from playdo.cli.historical_conversation import HistoricalConversation
 import logging
 
 
-def main():
+def main() -> None:
     logger = logging.getLogger("playdo")
     logger.setLevel(logging.INFO)
     handler = logging.StreamHandler()
