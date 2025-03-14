@@ -1,12 +1,25 @@
 ---
-description: ALWAYS run mypy and ruff: MANDATORY
-globs: *.py
+description: MANDATORY Code Quality Verification (linters, typecheckers)
+globs:
 alwaysApply: true
 ---
+# MANDATORY Code Quality Verification
+**Applies to:** Python files (*.py)
 
-# MANDATORY code quality verification
+After changing Python code, you MUST run:
 
-If you changed Python code, ALWAYS:
-[ ] Run typechecker: `uv run mypy .`
-[ ] Run linter/formatter: `uv run ruff check --fix .` and `uv run ruff format .`
-[ ] As mentioned by other rules, still also run tests: `uv run pytest`
+1. Type checker:
+   ```bash
+   uv run mypy .
+   ```
+
+2. Linter/formatter:
+   ```bash
+   uv run ruff check --fix .
+   uv run ruff format .
+   ```
+
+3. Tests (as per other rules):
+   ```bash
+   uv run pytest
+   ```

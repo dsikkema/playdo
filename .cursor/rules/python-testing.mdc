@@ -1,11 +1,16 @@
 ---
-description: ALWAYS write PyTest tests: MANDATORY
-globs: *.py
-alwaysApply: false
+description: ALWAYS write or update test cases for code
+globs:
+alwaysApply: true
 ---
-# Python Tests
+# Python Testing Requirements
+**Applies to:** Python files (*.py)
 
-## When to write new tests, new test cases, or update existing test cases
-When adding features, fixing bugs, or making any changes, write automated tests with PyTest that logically covers the change. Run tests to verify they pass using `uv run pytest`.
+## ALWAYS Write Tests
+When adding features, fixing bugs, or making changes:
+- You MUST write automated tests with PyTest
+- Tests MUST logically cover the changes made
+- Run tests using `uv run pytest` to verify they pass
 
-A bug is not fixed until a test prove that it's fixed, that would have failed without fixing the bug.
+## Bug Fixing Rule
+A bug is **NOT FIXED** until a test proves it's fixed that would have failed before the fix.

@@ -3,13 +3,14 @@ Models for messages and content blocks, meant to be json-serializable (unlike An
 and also well-typed (unlike dictionaries).
 """
 
-from typing import Optional, Literal
+from typing import Optional, Literal, Dict, Any
 from anthropic.types import Message, ContentBlock, MessageParam
 import xml.etree.ElementTree as ET
 import xml.dom.minidom
 import datetime
+import re
 
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, field_validator, ConfigDict
 
 
 class PlaydoContent(BaseModel):
@@ -115,3 +116,33 @@ class ConversationHistory(BaseModel):
     id: int
     created_at: Optional[datetime.datetime] = None
     updated_at: Optional[datetime.datetime] = None
+
+
+class User(BaseModel):
+    """
+    User model for authentication and user management.
+    """
+
+    id: Optional[int] = None
+    username: str
+    email: EmailStr
+    password_hash: str
+    password_salt: str
+    is_admin: bool = False
+    created_at: Optional[datetime.datetime] = None
+    updated_at: Optional[datetime.datetime] = None
+
+    @field_validator("username")
+    @classmethod
+    def username_must_be_valid(cls, v):
+        if len(v) < 4:
+            raise ValueError("Username must be at least 4 characters")
+        if not re.match(r"^[a-zA-Z0-9_]+$", v):
+            raise ValueError("Username may contain only alphanumeric characters and underscores")
+        return v
+
+    model_config = ConfigDict(from_attributes=True)
+
+    def to_dict_for_display(self) -> Dict[str, Any]:
+        """Return a dictionary suitable for display (excluding sensitive fields)"""
+        return self.model_dump(exclude={"password_hash", "password_salt"})

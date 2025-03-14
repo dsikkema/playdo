@@ -21,13 +21,19 @@ The Playdo backend consists of several key components:
 
 2. **ConversationRepository** - Manages database operations for storing and retrieving conversations and messages in SQLite.
 
-3. **ResponseGetter** - Interfaces with the Anthropic Claude API to generate AI responses for user messages.
+3. **UserRepository** - Manages database operations for user authentication and management in SQLite.
 
-4. **Models** - Pydantic data models that represent conversations, messages, and content blocks, ensuring type safety across the application.
+4. **UserService** - Handles user management operations including account creation, updates, authentication, password hashing, and validation.
 
-5. **Settings** - Configuration management via environment variables, making the application configurable across different environments.
+5. **ResponseGetter** - Interfaces with the Anthropic Claude API to generate AI responses for user messages.
 
-6. **CLI Interface** - A command-line interface for interacting with the application, useful for testing and development.
+6. **Models** - Pydantic data models that represent conversations, messages, content blocks, and users, ensuring type safety across the application.
+
+7. **Settings** - Configuration management via environment variables, making the application configurable across different environments.
+
+8. **CLI Interface** - A command-line interface for interacting with the application, useful for testing and development. There is an
+   app at playdo/cli/user_cli.py that can be run with `python -m playdo.cli.user_cli`, which manages user accounts, and also an app at
+   playdo/cli/cli_app.py that can be run with `python -m playdo.cli.cli_app`, which is used to view and send messages on conversations.
 
 ## Main Application Structure
 
@@ -35,13 +41,17 @@ Playdo follows a modular architecture
 
 - **app.py** - Entry point for the web application, creates and configures the Flask app.
 - **playdo_app.py** - Custom Flask application class with utility methods.
-- **endpoints/** - Contains API route definitions organized by domain (conversations).
+- **endpoints/** - Contains API route definitions organized by domain (conversations, auth).
 - **models.py** - Data models for the application using Pydantic.
 - **conversation_repository.py** - Database operations for conversations.
+- **user_repository.py** - Database operations for user management.
+- **svc/user_service.py** - User management and authentication service.
+- **validators.py** - Data validation utilities like password complexity validation.
 - **response_getter.py** - Anthropic Claude API integration.
 - **settings.py** - Application configuration via environment variables.
 - **db.py** - Database connection management.
 - **cli/** - Command-line interface for the application.
+  - **user_cli.py** - CLI tool for user management.
 
 ## File Structure
 
@@ -53,20 +63,26 @@ playdo
 ├── cli
 │   ├── __init__.py
 │   ├── cli_app.py                 # CLI application entry point
-│   └── historical_conversation.py # Interactive CLI conversation
+│   ├── historical_conversation.py # Interactive CLI conversation
+│   └── user_cli.py                # User management CLI
 ├── conversation_repository.py     # Database operations for conversations
+├── user_repository.py             # Database operations for users
 ├── db.py                          # Database utilities
 ├── endpoints
+│   ├── auth.py                    # Authentication endpoints (login)
 │   └── conversations.py           # API endpoints for conversations
 ├── models.py                      # Pydantic data models
 ├── playdo_app.py                  # Custom Flask application class
 ├── response_getter.py             # Anthropic Claude API integration
+├── svc                            # Service layer
+│   └── user_service.py            # User authentication and management services
+├── validators.py                  # Data validation utilities
 └── settings.py                    # Application configuration
 
 # project root:
  $ ls -1p
 ARCHITECTURE.md                    # High-level architecture documentation
-DETAILED_TECHNICAL_NOTES.md        # This file
+TECHNICAL_NOTES.md                 # This file
 README.md                          # Project overview
 bin/                               # Scripts and executables
 cli-readme.md                      # CLI documentation
@@ -81,6 +97,7 @@ run.sh                             # Script to run the web application
 sanity_test.py                     # Basic smoke tests
 schema.sql                         # Database schema
 tests/                             # Test suite
+user_cli.sh                        # Script to run the user management CLI
 uv.lock                            # Dependency lock file
 ```
 
@@ -157,21 +174,81 @@ Playdo integrates the code editor with the chat interface, allowing the AI tutor
 
 6. **Efficiency** - The XML representation is designed to be token-efficient, using status attributes to indicate when code hasn't been run rather than including redundant explanations.
 
+## User Management System
+
+The Playdo application includes a user management system for authentication and authorization:
+
+1. **User Model** - The User model includes:
+   - `id`: Unique identifier for the user
+   - `username`: Unique username (alphanumeric and underscores only)
+   - `email`: Unique email address (case-insensitive)
+   - `password_hash`: Argon2 hash of the user's password
+   - `password_salt`: Unique salt for password hashing
+   - `is_admin`: Boolean flag for admin privileges
+   - `created_at` and `updated_at`: Timestamps for user creation and updates
+
+2. **UserRepository** - This component manages database operations for users:
+   - Create, read, update, and delete operations for users
+   - Case-insensitive email uniqueness validation
+   - Username uniqueness validation
+
+3. **UserService** - This component handles user authentication and management:
+   - User creation with password hashing
+   - User login and authentication
+   - User updates with validation
+   - Password complexity validation (via the validators module)
+   - Uniqueness validation for email and username
+   - Password hashing and verification using Argon2
+   - Serves as central point for all user-related operations
+
+4. **Validators Module** - Provides standalone validation functions:
+   - Password complexity validation (12+ characters, mix of letters and numbers)
+   - Reusable across different parts of the application
+
+5. **CLI Tool** - A command-line interface for user management:
+   - Create users with secure password handling
+   - List all users
+   - Get user details by ID, username, or email
+   - Update user details (username, email, password, admin status)
+   - Delete users
+   - Automatic backup of user data before destructive operations
+   - Logging of all user management operations
+
+6. **Security Features**:
+   - Passwords are never stored in plain text
+   - Each user has a unique salt for password hashing
+   - Argon2 is used for secure password hashing
+   - Password validation ensures strong passwords (12+ characters, mix of letters and numbers)
+   - Confirmation required for destructive operations (admin creation, admin status change, deletion)
+
+7. **Authentication Flow**:
+   - User provides username and password to `/login` endpoint
+   - UserService validates credentials and returns the user if valid
+   - JWT token is generated with user information and claims
+   - Client uses the JWT token for subsequent authenticated requests
+
 ## Key Design Principles
 
 Playdo follows several key design principles:
 
 1. **Repository Pattern** - Database operations are encapsulated in repository classes.
 
-2. **Context Managers** - Resources like database connections are managed with context managers for proper cleanup.
+2. **Service Layer Pattern** - Business logic is encapsulated in service classes that use the repositories.
 
-3. **Type Safety** - Extensive use of type hints and Pydantic models for runtime type checking.
+3. **Separation of Concerns** - Clear separation between data access (repositories), business logic (services), and presentation (endpoints).
+   Note: the web layer should ideally call services which can manage intermediate application logic and then those can call repositories.
 
-4. **Environment-based Configuration** - All configuration is managed via environment variables.
+4. **Context Managers** - Resources like database connections are managed with context managers for proper cleanup.
 
-5. **REST API Design** - The backend exposes a RESTful API for the frontend to consume.
+5. **Type Safety** - Extensive use of type hints and Pydantic models for runtime type checking.
 
-6. **Seamless Context Sharing** - The system automatically ensures the AI tutor has the context it needs without the student having to think about it.
+6. **Environment-based Configuration** - All configuration is managed via environment variables.
+
+7. **REST API Design** - The backend exposes a RESTful API for the frontend to consume.
+
+8. **Seamless Context Sharing** - The system automatically ensures the AI tutor has the context it needs without the student having to think about it.
+
+9. **Secure Authentication** - User authentication is handled securely with proper password hashing and validation.
 
 ## Technical Dependencies
 
@@ -179,7 +256,7 @@ The Playdo backend relies on several key technologies:
 
 1. **Flask** - Web framework for the API.
 
-2. **SQLite** - Lightweight database for storing conversations.
+2. **SQLite** - Lightweight database for storing conversations and user data.
 
 3. **Pydantic** - Data validation and settings management.
 
@@ -193,9 +270,9 @@ The Playdo backend relies on several key technologies:
 
 8. **Pytest** - Testing framework for Python.
 
-## Cursor Rules Reminders:
-There are rules in the context window. They contain instructions for the AI writing code about how to properly design tests and verify functionality with
-running tests, linters, typecheckers, etc. ALWAYS think about how to properly implement these rules when writing code.
+9. **Argon2** - Secure password hashing algorithm.
+
+10. **Click** - Command-line interface toolkit.
 
 ## AI Integration
 
@@ -223,3 +300,39 @@ The Playdo application integrates with the Anthropic Claude API to generate AI r
    - PlaydoMessage objects include additional metadata like editor code and outputs
    - These are converted to Anthropic's MessageParam objects for API requests
    - Anthropic Message objects are converted back to PlaydoMessage objects for internal use
+
+## Testing Strategy
+
+The Playdo application uses a comprehensive testing strategy that balances unit tests with integration tests:
+
+1. **Test Organization**
+   - Unit tests in `tests/svc/` for service layer components
+   - Integration tests in `tests/integration/` for database and API operations
+   - Test fixtures in `tests/conftest.py` for common test setup
+
+2. **Test Fixtures**
+   - `initialized_test_db_path`: Creates a temporary SQLite database with schema
+   - `test_app`: Creates a Flask test application
+   - `test_user`: Creates a test user with known credentials
+   - `authorized_client`: Creates an authenticated test client which will always attach a valid Authorization header
+
+3. **Integration Testing Approach**
+   - For components whose primary job is data integration (repositories, CLI apps, API endpoints), we use real database connections
+   - Integration tests verify actual database operations, SQL queries, and API endpoints
+   - Each test gets a fresh database instance via the `initialized_test_db_path` fixture
+
+4. **Unit Testing Approach**
+   - Service layer components use mocked dependencies
+   - Focus on business logic and validation
+   - Verify correct interaction with dependencies
+   - Example: UserService tests mock UserRepository to verify password hashing and validation
+
+5. **Test Coverage**
+   - Tests cover both success and failure cases
+   - Edge cases and error conditions are explicitly tested
+   - Database constraints and unique validations are verified
+   - API endpoints are tested with both valid and invalid inputs
+
+## Cursor Rules Reminders:
+There are rules in the context window. They contain instructions for the AI writing code about how to properly design tests and verify functionality with
+running tests, linters, typecheckers, etc. ALWAYS think about how to properly implement these rules when writing code.

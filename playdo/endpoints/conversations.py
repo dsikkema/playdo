@@ -9,6 +9,7 @@ import logging
 from flask import Blueprint, jsonify, request, current_app
 from flask.typing import ResponseReturnValue
 import sqlite3
+from flask_jwt_extended import jwt_required
 
 from playdo.playdo_app import PlaydoApp
 from playdo.response_getter import ResponseGetter
@@ -25,6 +26,7 @@ def get_app() -> PlaydoApp:
 
 
 @conversations_bp.route("/conversations", methods=["GET"])
+@jwt_required()
 def list_conversations() -> ResponseReturnValue:
     """Get a list of all conversation IDs."""
     app = get_app()
@@ -34,6 +36,7 @@ def list_conversations() -> ResponseReturnValue:
 
 
 @conversations_bp.route("/conversations", methods=["POST"])
+@jwt_required()
 def create_conversation() -> ResponseReturnValue:
     """Create a new conversation."""
     app = get_app()
@@ -43,6 +46,7 @@ def create_conversation() -> ResponseReturnValue:
 
 
 @conversations_bp.route("/conversations/<int:conversation_id>", methods=["GET"])
+@jwt_required()
 def get_conversation(conversation_id: int) -> ResponseReturnValue:
     """Get a specific conversation with all its messages."""
     app = get_app()
@@ -55,6 +59,7 @@ def get_conversation(conversation_id: int) -> ResponseReturnValue:
 
 
 @conversations_bp.route("/conversations/<int:conversation_id>/send_message", methods=["POST"])
+@jwt_required()
 def send_new_message(conversation_id: int) -> ResponseReturnValue:
     """
     Add a user message to a conversation and get the assistant's response.

@@ -1,12 +1,21 @@
 ---
-description: When writing python functions use typehints
-globs: *.py
+description: Always Use Type Hints in Python
+globs:
 alwaysApply: true
 ---
+# Always Use Type Hints in Python
+**Applies to:** Python files (*.py)
 
-# Always use typehints for python functions
+When writing Python functions, you MUST:
+- Provide type hints for all parameters
+- Include return type annotations
+- Use `Optional[Type]` for values that may be None
 
-When writing functions:
-[ ] Make sure parameters are typed
-[ ] Make sure return value is typed
-[ ] Optionals (that may be None) are typed as Optional
+```python
+# GOOD
+def process_data(input_list: list[str], max_items: Optional[int] = None) -> dict[str, int]:
+    # Implementation
+
+# BAD
+def process_data(input_list, max_items=None):
+    # Implementation

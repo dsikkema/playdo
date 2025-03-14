@@ -5,7 +5,8 @@ from playdo.conversation_repository import conversation_repository
 from playdo.cli.historical_conversation import HistoricalConversation
 import logging
 
-if __name__ == "__main__":
+
+def main() -> None:
     logger = logging.getLogger("playdo")
     logger.setLevel(logging.INFO)
     handler = logging.StreamHandler()
@@ -17,3 +18,7 @@ if __name__ == "__main__":
         response_getter: ResponseGetter = ResponseGetter()
         historical_conversation = HistoricalConversation(conversation_history, response_getter)
         historical_conversation.run_historical_conversation()
+
+
+if __name__ == "__main__":
+    main()
