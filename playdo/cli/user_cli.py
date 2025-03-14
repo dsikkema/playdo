@@ -85,6 +85,9 @@ def get_password() -> str:
     """
     Prompt for password with confirmation.
     """
+    pwd_from_env_var = os.environ.get("PLAYDO_CREATE_USER_PWD")
+    if pwd_from_env_var:
+        return pwd_from_env_var
     while True:
         password = getpass.getpass("Enter password: ")
 
@@ -137,6 +140,8 @@ def cli(db_path: Optional[Path] = None):
 def create(username: str, email: str, admin: bool, force: bool):
     """
     Create a new user.
+
+    Password can be provided via the PLAYDO_CREATE_USER_PWD environment variable or stdin
     """
     with user_service(Path(settings.DATABASE_PATH)) as user_svc:
         # Get password
@@ -225,6 +230,8 @@ def get(id: Optional[int], username: Optional[str], email: Optional[str]):
 def update(id: int, username: Optional[str], email: Optional[str], password: bool, admin: Optional[bool], force: bool):
     """
     Update user details.
+
+    Password can be provided via the PLAYDO_CREATE_USER_PWD environment variable or stdin
     """
 
     with user_service(Path(settings.DATABASE_PATH)) as user_svc:
