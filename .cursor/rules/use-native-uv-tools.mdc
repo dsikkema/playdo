@@ -1,9 +1,23 @@
 ---
-description: UV-native tooling only
-globs: *.py,pyproject.toml
+description: Use UV-Native Tooling ONLY for tests/dependencies
+globs:
 alwaysApply: true
 ---
-# Use uv-native tooling
-Use `uv add` and `uv sync` for dependency management. Never use `requirements.txt`, `pip`, `uv pip`; do not use anything pip-related.
+# Use UV-Native Tooling ONLY
+**Applies to:** Python files (*.py), pyproject.toml
 
-Run tests and linters with `uv run ruff --fix...`, `uv run mypy...`, `uv run pytest...` etc.
+## Dependency Management
+- ALWAYS use `uv add` and `uv sync` for dependencies
+- NEVER use `requirements.txt`, `pip`, or any pip-related tools
+
+## Running Tools
+Run all tools through UV:
+```bash
+uv run ruff check --fix .
+uv run ruff format .
+uv run mypy .
+uv run pytest
+```
+
+## Reminder
+Do NOT use `pip`, `pip install`, or `uv pip install` ever.

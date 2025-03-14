@@ -308,6 +308,10 @@ def test_login_missing_fields(authorized_client: FlaskClient, test_user: dict) -
 
 
 def test_unauthorized_access(test_app: PlaydoApp) -> None:
-    """Test accessing a protected endpoint without authentication."""
+    """
+    Test accessing a protected endpoint without authentication.
+    """
+
+    # request should 401 because it's not the authorized_client fixture making it, but a client which hasn't been wired up with an auth header
     response = test_app.test_client().get("/api/conversations")
     assert response.status_code == 401

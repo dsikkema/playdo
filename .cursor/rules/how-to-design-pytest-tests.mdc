@@ -1,58 +1,116 @@
 ---
-description: HOW to write pytest tests
-globs: test_*.py
+description: How to Design Pytest Tests
+globs:
 alwaysApply: true
 ---
-# Test case designs and scopes
+# How to Design Pytest Tests
+**Applies to:** Test files (test_*.py)
 
-## States to test
-Make sure there are test cases covering the initial state (perhaps reading / writing some entity that's new, or empty) and non-initial states (like reading / writing entities after they've been created and non-empty). When applicable,
-also test when there are zero, or one, or many of something. Use parametrized tests when appropriate to test many combinations of inputs/outputs:
-```
+## Test States Thoroughly
+- Test initial/empty states and non-empty states
+- Test with zero, one, and multiple items when applicable
+- Use parametrized tests for multiple test cases:
+
+```python
 @pytest.mark.parametrize("a, b, expected", [
     ([1, 3], [2, 4], [1, 2, 3, 4]),
-    (
-            [], [1, 3], [1, 3]
-    ),
-    (
-            [1, 3], [], [1, 3]
-    ),
-    # ...
+    ([], [1, 3], [1, 3]),
+    ([1, 3], [], [1, 3]),
 ])
 def test_merge(a, b, expected):
     assert merge(a, b) == expected
-
 ```
 
-## Testing database-related components
-For components (like repositories) that explicitly connect to a database directly (such as calling a db sdk or making SqlAlchemy calls), create a live running database fixture to plug into the component, and use the component in a round trip way such as this:
-```
+## Database Component Testing
+For components directly connecting to databases:
+- Create live database fixtures
+- Test with round-trip operations:
+
+```python
 entity = make_entity()
 repository.save(entity)
-retrieved = respository.get(entity.id)
-assert entity == retrieved # or more narrow comparison, as appropriate
+retrieved = repository.get(entity.id)
+assert entity == retrieved
 repository.delete(entity.id)
 assert repository.get(entity.id) is None
 ```
 
 ## Mocking
-For components that don't directly interface with database SDKs, SqlAlchemy, etc, but only interface with other application components (such as a repository which abstracts away the database interaction), use mocking
-to set up test cases.
+For components interfacing with other application components:
+- Use mocking to isolate components under test
 
-Example:
-```
-from unittest.mock import Mock, patch, MagicMock
-
-def test_historical_conversation_new_conversation_flow():
+```python
+def test_conversation_flow():
     # Mock dependencies
     mock_conversation_history = Mock()
-    mock_response_getter = Mock()
-
-    # Set up mock conversation history repository
     mock_conversation_history.get_all_conversation_ids.return_value = []
-    # ... etc
+    # Additional setup and assertions
 ```
 
-## Simplicity
-Do NOT write complicated tests that have excessive assertions or mock things in too sophisticated a manner. Tests must be simple, their assertions MUST be the minimum
-essentials that capture quality.
+## KEEP TESTS SIMPLE
+- Tests MUST have minimal, essential assertions
+- Avoid overcomplicated mocking
+- Tests should be easy to understand and maintain
+
+## AVOID TEST FLAILING AND ARTIFICIAL COMPLEXITY
+When tests fail, DO NOT:
+- Keep adding complexity to tests to make them pass
+- Add conditional logic to application code that only exists to satisfy tests
+- Add parameters to functions that are only used in tests
+- Make more than 2-3 attempts to fix a test with the same approach
+
+### Signs of Flailing:
+- Adding multiple conditions to application code to handle test edge cases
+- Test setup grows increasingly complex
+- Making unrelated changes in hope they might fix the issue
+- Adding more mocks without understanding why they're needed
+
+### What to do when a test has failed multiple times in a row
+- Splash cold water in your face (metaphorically), and back up to understand the faulty assumptions that are being made
+- Assume that you have a basic misunderstanding of a certain library or technique, and hand control back to the user
+- ASK THE USER FOR HELP
+
+### CORRECT Approach to Failing Tests:
+
+1. **ALWAYS first diagnose the actual issue**:
+   ```python
+   # Add debugging to print intermediate values
+   def test_user_query():
+       result = process_query("example")
+       print(f"DEBUG: result={result}")  # <-- Temporary debug
+       assert result.status == "success"
+   ```
+
+2. **Fix the root cause, not the symptom**:
+   ```python
+   # BAD - Adding conditional just to make test pass
+   def process_data(input_data):
+       if input_data == "test_value":  # <-- Artificial test-only condition
+           return SuccessResult()
+       # Normal processing...
+
+   # GOOD - Fix the actual logic issue
+   def process_data(input_data):
+       # Logic that correctly handles all valid inputs
+       # including the test case naturally
+   ```
+
+3. **If stuck after 2-3 attempts: STOP and reconsider the approach**
+   - Re-examine test expectations - are they correct?
+   - Consider if the application logic has a fundamental design flaw
+   - Ask for clarification rather than adding complexity
+
+4. **Sometimes the issue is in test expectations, not the code:**
+   ```python
+   # BAD - Complex test forcing a specific implementation
+   def test_complex():
+       result = processor.process("data")
+       assert isinstance(result.inner_field.data_structure[0], ExpectedType)
+       assert result.inner_field.data_structure[0].method() == "specific value"
+
+   # GOOD - Test focused on behavior not implementation
+   def test_behavior():
+       result = processor.process("data")
+       assert result.contains("expected data")
+       assert result.is_valid()
+   ```

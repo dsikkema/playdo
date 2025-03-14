@@ -1,5 +1,4 @@
 #!/bin/bash
-#TOODO remove this
 
 # Wrapper script for user management CLI
 # This script ensures the proper environment for running the user_cli tool

@@ -1,103 +1,65 @@
 ---
-description: Ensures technical documentation is updated after code changes
-globs: *.py, pyproject.toml, schema.sql
-alwaysApply: false
+description: Update TECHNICAL_NOTES.md After any large Changes
+globs:
+alwaysApply: true
 ---
 # Update Technical Documentation After Changes
+**Applies to:** Python files, pyproject.toml, schema.sql
 
-This rule ensures that after any substantive changes to the application (such as adding new components,
-changing logical flows, or implementing new features), the DETAILED_TECHNICAL_NOTES.md document is updated
-to reflect these changes.
+## When to Update Documentation
+You MUST update [TECHNICAL_NOTES.md](mdc:TECHNICAL_NOTES.md) after making substantive changes to the application.
 
-<rule>
-name: update_technical_docs_after_changes
-description: Ensures DETAILED_TECHNICAL_NOTES.md is updated after significant code changes
+## Why
+That document is used to provide information to developers in the future. If there are significant changes to components or app logic
+that are not reflected in that document, then developers will be confused about how the code actually works.
 
-filters:
-  - type: file_extension
-    pattern: "\\.py$"
-  - type: event
-    pattern: "code_generation|edit_suggestion|file_create"
+## Changes Requiring Documentation Updates
+1. **New Components**
+   - Add to "Core Components" section
+   - Describe purpose and integration
 
-actions:
-  - type: suggest
-    message: |
-      After making substantive changes to the application, update the DETAILED_TECHNICAL_NOTES.md document to reflect these changes.
+2. **Modified Application Structure**
+   - Update "File Structure" section
+   - Update "Main Application Structure" if architecture changed
 
-      ## Changes requiring documentation updates:
+3. **Changes to Data Flow**
+   - Update "Data Flow" section
+   - Document new API endpoints or data transformations
 
-      1. **New Components**:
-         - If you've added a new major component, ensure it's listed in the "Core Components" section
-         - Describe its purpose, responsibility, and how it integrates with existing components
+4. **New Dependencies**
+   - Add to "Technical Dependencies" section
+   - Include purpose and integration method
 
-      2. **Modified Application Structure**:
-         - If you've changed the file structure or added new files, update the "File Structure" section
-         - If you've modified the architecture pattern, update the "Main Application Structure" section
+## Documentation Update Process
+1. Review current documentation structure
+2. Identify sections needing updates
+3. Maintain consistent formatting and detail level
+4. Keep updates concise and focused on architectural impact
+5. When in doubt, include the documentation
 
-      3. **Changes to Data Flow**:
-         - If data flows through the system differently, update the "Data Flow" section
-         - Ensure any new API endpoints or data transformations are documented
+## Example
+```
+# Before: Missing documentation for new component
 
-      4. **New Dependencies**:
-         - If you've added new technical dependencies, add them to the "Technical Dependencies" section
-         - Include their purpose and how they're integrated
+# New file: playdo/user_repository.py
+class UserRepository:
+    """
+    Manages user data and preferences.
+    """
+    def __init__(self, db_path: Path):
+        self.conn = sqlite3.connect(str(db_path))
+        self.cursor = self.conn.cursor()
 
-      5. **Changed Design Principles**:
-         - If new design patterns were introduced, document them in "Key Design Principles"
+    def get_user(self, user_id: int) -> User:
+        # Implementation
+        pass
 
-      ## Process for updating documentation:
+# After: With proper documentation updates
+# In TECHNICAL_NOTES.md, Core Components section:
 
-      1. Read the current DETAILED_TECHNICAL_NOTES.md to understand its structure
-      2. Identify which sections need updates based on your changes
-      3. Maintain the existing formatting and level of detail
-      4. Keep updates concise, focusing on the architectural impact rather than implementation details
-      5. If you're unsure whether a change is significant enough to document, err on the side of inclusion
+7. **UserRepository** - Manages database operations for storing and
+   retrieving user data and preferences.
 
-examples:
-  - input: |
-      # AI adds a new component without updating documentation
+# And in Main Application Structure:
 
-      # New file: playdo/user_repository.py
-      class UserRepository:
-          """
-          Manages user data and preferences.
-          """
-          def __init__(self, db_path: Path):
-              self.conn = sqlite3.connect(str(db_path))
-              self.cursor = self.conn.cursor()
-
-          def get_user(self, user_id: int) -> User:
-              # Implementation
-              pass
-    output: |
-      # AI adds a new component AND updates documentation
-
-      # New file: playdo/user_repository.py
-      class UserRepository:
-          """
-          Manages user data and preferences.
-          """
-          def __init__(self, db_path: Path):
-              self.conn = sqlite3.connect(str(db_path))
-              self.cursor = self.conn.cursor()
-
-          def get_user(self, user_id: int) -> User:
-              # Implementation
-              pass
-
-      # AI also updates DETAILED_TECHNICAL_NOTES.md to include the new component
-      # In the Core Components section:
-      """
-      7. **UserRepository** - Manages database operations for storing and retrieving user data and preferences.
-      """
-
-      # And updates the Main Application Structure to include:
-      """
-      - **user_repository.py** - Database operations for user data.
-      """
-
-metadata:
-  priority: high
-  version: 1.0
-  tags: ["documentation", "maintenance", "technical-debt"]
-</rule>
+- **user_repository.py** - Database operations for user data.

@@ -1,0 +1,129 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# NEVER Make Unnecessary Changes to Working Code
+**Applies to:** All code files
+
+## WHY This Rule Matters
+Unnecessary changes to working code:
+- Break existing tests that depend on specific messages or structure
+- Remove context other developers rely on
+- Risk introducing subtle bugs
+- Create unnecessary code churn
+
+## What You MUST Preserve
+When modifying existing code, you MUST:
+- **KEEP all existing code comments**, especially explanatory ones
+- **PRESERVE error and validation messages** exactly as they are
+- **MAINTAIN existing code structure** when it already works
+- **RETAIN variable/function names** unless refactoring is explicitly required
+
+## Acceptable Changes ONLY
+You may ONLY change existing working code for:
+- Functional requirements that explicitly demand the change
+- Meaningful refactoring with clear benefits
+- Fixing actual bugs or security issues
+- Changes specifically requested by the user
+
+## NEVER Change Code Based Only On
+- Personal style preferences
+- Subjective "improvements" without concrete benefits
+- Making code more concise without functional reason
+- Different but equivalent ways of doing the same thing
+
+## Examples of BAD Changes (AVOID)
+
+```javascript
+// Original code:
+function validateInput(input) {
+  if (input === null || input === undefined) {
+    throw new Error("Input cannot be null or undefined");
+  }
+  // Long explanatory comment about the validation logic
+  // that spans multiple lines with important context...
+  if (input.length < 3) {
+    return { valid: false, message: "Input must be at least 3 characters" };
+  }
+  return { valid: true };
+}
+
+// BAD: Unnecessary changes
+function validateInput(input) {
+  if (!input) {
+    throw new Error("Invalid input");  // Changed error message!
+  }
+  // Comment removed or shortened!
+  return input.length >= 3
+    ? { valid: true }
+    : { valid: false, message: "Too short" };  // Changed message!
+}
+```
+
+```javascript
+// Original API endpoint:
+app.get('/users/:id', (req, res) => {
+  const user = findUser(req.params.id);
+  if (!user) {
+    return res.status(404).json({ error: "User not found" });
+  }
+  return res.json({
+    id: user.id,
+    name: user.name,
+    createdAt: user.createdAt
+  });
+});
+
+// BAD: Changed response format
+app.get('/users/:id', (req, res) => {
+  const user = findUser(req.params.id);
+  if (!user) {
+    return res.status(404).json({ message: "Cannot find user" }); // Changed!
+  }
+  return res.json({
+    userId: user.id,  // Changed field name!
+    userName: user.name,  // Changed field name!
+    created: user.createdAt  // Changed field name!
+  });
+});
+```
+
+## Examples of GOOD Changes (DO THIS)
+
+```javascript
+// GOOD: Adding functionality while preserving existing code
+function validateInput(input) {
+  if (input === null || input === undefined) {
+    throw new Error("Input cannot be null or undefined");
+  }
+  // Long explanatory comment about the validation logic
+  // that spans multiple lines with important context...
+  if (input.length < 3) {
+    return { valid: false, message: "Input must be at least 3 characters" };
+  }
+  // New functionality added without changing existing logic
+  if (!/^[a-zA-Z0-9]+$/.test(input)) {
+    return { valid: false, message: "Input must be alphanumeric" };
+  }
+  return { valid: true };
+}
+```
+
+```javascript
+// GOOD: Adding fields while preserving existing structure
+app.get('/users/:id', (req, res) => {
+  const user = findUser(req.params.id);
+  if (!user) {
+    return res.status(404).json({ error: "User not found" });
+  }
+  return res.json({
+    id: user.id,
+    name: user.name,
+    createdAt: user.createdAt,
+    // New fields added without changing existing ones
+    email: user.email,
+    isActive: user.status === 'active'
+  });
+});
+```

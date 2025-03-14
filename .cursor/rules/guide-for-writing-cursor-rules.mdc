@@ -1,0 +1,15 @@
+---
+description: Guide for writing cursor rules
+globs: *.mdc
+alwaysApply: false
+---
+
+# Writing Cursor Rules
+- Provide examples of what to do and not do
+- Explain motivations why: this helps the AI pay attention to the rule and better understand its applicability
+- Provide remarks about when the rule is applicable
+- If there are specific circumstances in which it's not applicable, list those
+- Use a highly structured format
+- Make rules concise and to the point: they will be forgotten if too wordy
+- It is MANDATORY that you MUST be verbally clear about things that are important. Use terms like "NEVER do this" and "this is REQUIRED". This helps the AI pay
+  attention to the important parts: the AI notices clear, attention-grabbing language.
