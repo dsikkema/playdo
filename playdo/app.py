@@ -54,8 +54,8 @@ def create_app(database_path: Optional[str] = None, testing: bool = False) -> Pl
         assert isinstance(jwt_data, dict), "JWT data must be a dictionary"
         assert "sub" in jwt_data, "JWT data must contain 'sub' key"
         assert isinstance(jwt_data["sub"], str), "JWT data 'sub' must be a string"
-        with app.user_repository() as repo:
-            return repo.get_user_by_id(int(jwt_data["sub"]))
+        with app.user_service() as user_svc:
+            return user_svc.get_user_by_id(int(jwt_data["sub"]))
 
     return app
 

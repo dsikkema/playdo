@@ -2,22 +2,21 @@
 Command-line interface for user management.
 """
 
-from argon2 import PasswordHasher
 import click
 import getpass
 import logging
 import json
 import os
-import re
 import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from playdo.svc.auth_service import AuthService
-from playdo.user_repository import UserRepository, UserAlreadyExistsError, UserNotFoundError, user_repository
+from playdo.svc.user_service import UserService, user_service
+from playdo.user_repository import UserNotFoundError
 from playdo.models import User
 from playdo.settings import settings
+from playdo.validators import validate_password_complexity
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +39,7 @@ def setup_logging() -> None:
     )
 
 
-def backup_users_table(repo: UserRepository) -> Optional[str]:
+def backup_users_table(user_svc: UserService) -> Optional[str]:
     """
     Create a backup of the users table.
     Returns the path to the backup file or None if backup failed.
@@ -54,7 +53,7 @@ def backup_users_table(repo: UserRepository) -> Optional[str]:
 
     try:
         # Get all users
-        users = repo.list_users()
+        users = user_svc.user_repo.list_users()
 
         # Convert to dict for JSON serialization
         users_dict = [
@@ -75,22 +74,11 @@ def backup_users_table(repo: UserRepository) -> Optional[str]:
         with open(backup_file, "w") as f:
             json.dump(users_dict, f, indent=2)
 
+        logger.info(f"Backup created at {str(backup_file)}")
         return str(backup_file)
     except Exception as e:
         logging.exception("Backup failed")
         raise e
-
-
-def validate_password(password: str) -> bool:
-    """
-    Validate password complexity requirements.
-    Password must be at least 12 characters and contain both letters and numbers.
-    """
-    if len(password) < 12:
-        return False
-    if not re.search(r"[A-Za-z]", password) or not re.search(r"[0-9]", password):
-        return False
-    return True
 
 
 def get_password() -> str:
@@ -100,7 +88,7 @@ def get_password() -> str:
     while True:
         password = getpass.getpass("Enter password: ")
 
-        if not validate_password(password):
+        if not validate_password_complexity(password):
             click.echo("Password must be at least 12 characters and contain both letters and numbers.")
             continue
 
@@ -150,7 +138,7 @@ def create(username: str, email: str, admin: bool, force: bool):
     """
     Create a new user.
     """
-    with user_repository(Path(settings.DATABASE_PATH)) as repo:
+    with user_service(Path(settings.DATABASE_PATH)) as user_svc:
         # Get password
         password = get_password()
 
@@ -160,22 +148,13 @@ def create(username: str, email: str, admin: bool, force: bool):
             return
 
         # Create backup before making changes
-        backup_file = backup_users_table(repo)
-        if backup_file:
-            logger.info(f"Backup created at {backup_file}")
-
-        # Hash password
-        password_hash, password_salt = AuthService(repo, PasswordHasher()).hash_password(password)
+        backup_users_table(user_svc)
 
         # Create user
         try:
-            user = repo.create_user(
-                User(username=username, email=email, password_hash=password_hash, password_salt=password_salt, is_admin=admin)
-            )
-
             # Log activity
-            log_fields = f"username={username}, email={email}, is_admin={admin}"
-            logger.info(f"User created: id={user.id}, {log_fields}")
+            user = user_svc.create_user(username, email, admin, password)
+            logger.info(f"User created: id={user.id}, username={username}, email={email}, is_admin={admin}")
 
             # Display created user
             click.echo("User created successfully:")
@@ -191,8 +170,8 @@ def list():
     """
     List all users.
     """
-    with user_repository(Path(settings.DATABASE_PATH)) as repo:
-        users = repo.list_users()
+    with user_service(Path(settings.DATABASE_PATH)) as user_svc:
+        users = user_svc.user_repo.list_users()
 
     if not users:
         click.echo("No users found.")
@@ -212,7 +191,7 @@ def get(id: Optional[int], username: Optional[str], email: Optional[str]):
     """
     Get user details by ID, username, or email.
     """
-    with user_repository(Path(settings.DATABASE_PATH)) as user_repo:
+    with user_service(Path(settings.DATABASE_PATH)) as user_svc:
         # Check that exactly one identifier is provided
         identifiers = [i for i in [id, username, email] if i is not None]
         if len(identifiers) != 1:
@@ -222,11 +201,11 @@ def get(id: Optional[int], username: Optional[str], email: Optional[str]):
         # Get user by the provided identifier
         user = None
         if id is not None:
-            user = user_repo.get_user_by_id(id)
+            user = user_svc.get_user_by_id(id)
         elif username is not None:
-            user = user_repo.get_user_by_username(username)
+            user = user_svc.get_user_by_username(username)
         elif email is not None:
-            user = user_repo.get_user_by_email(email)
+            user = user_svc.get_user_by_email(email)
 
     if not user:
         click.echo("User not found.")
@@ -248,110 +227,78 @@ def update(id: int, username: Optional[str], email: Optional[str], password: boo
     Update user details.
     """
 
-    with user_repository(Path(settings.DATABASE_PATH)) as user_repo:
+    with user_service(Path(settings.DATABASE_PATH)) as user_svc:
         # Check if at least one field is being updated
-        if username is None and email is None and not password and admin is None:
+        if not any([i is not None for i in [username, email, password, admin]]):
             click.echo("Error: Please provide at least one field to update.")
             return
 
         # Get existing user
-        user = user_repo.get_user_by_id(id)
-        if not user:
+        existing_user = user_svc.get_user_by_id(id)
+        if not existing_user:
             click.echo(f"Error: User with ID {id} not found.")
             return
 
-        if email:
-            user_with_email = user_repo.get_user_by_email(email)
-            if user_with_email:
-                if user_with_email.id != id:
-                    click.echo(f"Error: another user with email {email} already exists.")
-                    return
-                else:
-                    click.error("Email is the same as existing value.")
-                    return
-
-        if username:
-            user_with_username = user_repo.get_user_by_username(username)
-            if user_with_username:
-                if user_with_username.id != id:
-                    click.echo(f"Error: another user with username {username} already exists.")
-                    return
-                else:
-                    click.error("Username is the same as existing value.")
-                    return
-
         # Confirm admin status change
-        if admin is not None and admin != user.is_admin:
+        if admin is not None and admin != existing_user.is_admin:
             action = "grant" if admin else "revoke"
             if not force and not click.confirm(f"Are you sure you want to {action} admin privileges for this user?"):
                 click.echo("Operation cancelled.")
                 return
 
-        # Handle password update
+        # Get new password if updating password
         new_password = None
         if password:
             new_password = get_password()
 
         # Create backup before making changes
-        backup_file = backup_users_table(user_repo)
-        if backup_file:
-            logger.info(f"Backup created at {backup_file}")
+        backup_users_table(user_svc)
 
         # Update the user object before saving it
         log_fields = []
+
         if username is not None:
-            user.username = username
             log_fields.append(f"username={username}")
         if email is not None:
-            user.email = email
             log_fields.append(f"email={email}")
         if admin is not None:
-            user.is_admin = admin
             log_fields.append(f"is_admin={admin}")
         if new_password:
-            password_hash, password_salt = AuthService(user_repo, PasswordHasher()).hash_password(new_password)
-            user.password_hash = password_hash
-            user.password_salt = password_salt
             log_fields.append("password_updated=True")
 
         log_fields_str = ", ".join(log_fields)
 
         # Update user
         try:
-            updated_user = user_repo.update_user(user)
+            updated_user = user_svc.update_user(existing_user, username, email, admin, new_password)
             logger.info(f"User updated: id={id}, {log_fields_str}")
 
             # Display updated user
-            click.echo("User updated successfully:")
-            click.echo(format_user_for_display(updated_user))
-        except UserAlreadyExistsError as e:
-            click.echo(f"Error: {str(e)}")
-            logger.error(f"User update failed: {str(e)}, user_id={id}, fields: {log_fields_str}")
-            return
-        except UserNotFoundError as e:
-            click.echo(f"Error: {str(e)}")
-            logger.error(f"User update failed: {str(e)}, user_id={id}, fields: {log_fields_str}")
-            return
+            if updated_user:
+                click.echo("User updated successfully:")
+                click.echo(format_user_for_display(updated_user))
+            else:
+                click.echo("Warning: User was not updated.")
         except Exception as e:
             click.echo(f"Error: {str(e)}")
             logger.error(f"User update failed: {str(e)}, user_id={id}, fields: {log_fields_str}")
-            return
+            raise e
 
 
 @cli.command()
-@click.option("--id", type=int, required=True, help="User ID")
-def dummy_login(id: int):
+@click.option("--username", type=str, required=True, help="username")
+def dummy_login(username: str):
     """
     Dummy command for manually testing password verification.
     """
     password = getpass.getpass("Enter password: ")
-    with user_repository(Path(settings.DATABASE_PATH)) as repo:
-        user = repo.get_user_by_id(id)
-        if not user:
-            click.echo(f"Error: User with ID {id} not found.")
-            return
-        is_valid = AuthService(repo, PasswordHasher()).verify_password(password, user.password_hash, user.password_salt)
-    click.echo(f"Password verification result: {is_valid}")
+    with user_service(Path(settings.DATABASE_PATH)) as user_svc:
+        user = user_svc.login_user(username, password)
+
+    if user:
+        click.echo(f"Successfully logged in:\n\n{format_user_for_display(user)}")
+    else:
+        click.echo("Login failed.")
 
 
 @cli.command()
@@ -361,9 +308,9 @@ def delete(id: int, force: bool):
     """
     Delete a user.
     """
-    with user_repository(Path(settings.DATABASE_PATH)) as repo:
+    with user_service(Path(settings.DATABASE_PATH)) as user_svc:
         # Get user to display details before deletion
-        user = repo.get_user_by_id(id)
+        user = user_svc.get_user_by_id(id)
         if not user:
             click.echo(f"Error: User with ID {id} not found.")
             return
@@ -378,13 +325,11 @@ def delete(id: int, force: bool):
             return
 
         # Create backup before making changes
-        backup_file = backup_users_table(repo)
-        if backup_file:
-            logger.info(f"Backup created at {backup_file}")
+        backup_users_table(user_svc)
 
         # Delete user
         try:
-            repo.delete_user(id)
+            user_svc.delete_user(id)
             logger.info(f"User deleted: id={id}, username={user.username}, email={user.email}")
             click.echo("User deleted successfully.")
         except UserNotFoundError as e:

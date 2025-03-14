@@ -52,9 +52,9 @@ def login() -> ResponseReturnValue:
         return jsonify({"error": "Missing username or password"}), 400
 
     app = get_app()
-    with app.auth_service() as auth_service:
+    with app.user_service() as user_svc:
         # Validate credentials and get user
-        user = auth_service.login_user(username, password)
+        user = user_svc.login_user(username, password)
 
         if not user:
             # For security reasons, don't disclose whether username exists

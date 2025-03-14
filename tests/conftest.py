@@ -2,16 +2,13 @@ from collections.abc import Generator
 import logging
 from pathlib import Path
 
-from argon2 import PasswordHasher
 import pytest
 import sqlite3
 
-from playdo.models import User
 from playdo.playdo_app import PlaydoApp
 from playdo.settings import settings
 from playdo.app import create_app
-from playdo.svc.auth_service import AuthService
-from playdo.user_repository import UserRepository
+from playdo.svc.user_service import user_service
 from flask.testing import FlaskClient
 
 
@@ -50,16 +47,11 @@ def initialized_test_db_path(tmp_path: Path) -> Path:
 def test_user(initialized_test_db_path: Path) -> dict:
     """Create a test user and return their credentials."""
     # Create a test user
-    repo = UserRepository(initialized_test_db_path)
-    auth_service = AuthService(repo, PasswordHasher())
-    username = "testuser"
-    email = "test@example.com"
-    password = "password12345"
-    password_hash, password_salt = auth_service.hash_password(password)
-
-    user = repo.create_user(
-        User(username=username, email=email, password_hash=password_hash, password_salt=password_salt, is_admin=False)
-    )
+    with user_service(initialized_test_db_path) as user_svc:
+        username = "testuser"
+        email = "test@example.com"
+        password = "password12345"
+        user = user_svc.create_user(username, email, False, password)
 
     return {"id": user.id, "username": username, "email": email, "password": password}
 

@@ -23,13 +23,17 @@ The Playdo backend consists of several key components:
 
 3. **UserRepository** - Manages database operations for user authentication and management in SQLite.
 
-4. **ResponseGetter** - Interfaces with the Anthropic Claude API to generate AI responses for user messages.
+4. **UserService** - Handles user management operations including account creation, updates, authentication, password hashing, and validation.
 
-5. **Models** - Pydantic data models that represent conversations, messages, content blocks, and users, ensuring type safety across the application.
+5. **ResponseGetter** - Interfaces with the Anthropic Claude API to generate AI responses for user messages.
 
-6. **Settings** - Configuration management via environment variables, making the application configurable across different environments.
+6. **Models** - Pydantic data models that represent conversations, messages, content blocks, and users, ensuring type safety across the application.
 
-7. **CLI Interface** - A command-line interface for interacting with the application, useful for testing and development.
+7. **Settings** - Configuration management via environment variables, making the application configurable across different environments.
+
+8. **CLI Interface** - A command-line interface for interacting with the application, useful for testing and development. There is an
+   app at playdo/cli/user_cli.py that can be run with `python -m playdo.cli.user_cli`, which manages user accounts, and also an app at
+   playdo/cli/cli_app.py that can be run with `python -m playdo.cli.cli_app`, which is used to view and send messages on conversations.
 
 ## Main Application Structure
 
@@ -37,10 +41,12 @@ Playdo follows a modular architecture
 
 - **app.py** - Entry point for the web application, creates and configures the Flask app.
 - **playdo_app.py** - Custom Flask application class with utility methods.
-- **endpoints/** - Contains API route definitions organized by domain (conversations).
+- **endpoints/** - Contains API route definitions organized by domain (conversations, auth).
 - **models.py** - Data models for the application using Pydantic.
 - **conversation_repository.py** - Database operations for conversations.
 - **user_repository.py** - Database operations for user management.
+- **svc/user_service.py** - User management and authentication service.
+- **validators.py** - Data validation utilities like password complexity validation.
 - **response_getter.py** - Anthropic Claude API integration.
 - **settings.py** - Application configuration via environment variables.
 - **db.py** - Database connection management.
@@ -63,16 +69,20 @@ playdo
 ├── user_repository.py             # Database operations for users
 ├── db.py                          # Database utilities
 ├── endpoints
+│   ├── auth.py                    # Authentication endpoints (login)
 │   └── conversations.py           # API endpoints for conversations
 ├── models.py                      # Pydantic data models
 ├── playdo_app.py                  # Custom Flask application class
 ├── response_getter.py             # Anthropic Claude API integration
+├── svc                            # Service layer
+│   └── user_service.py            # User authentication and management services
+├── validators.py                  # Data validation utilities
 └── settings.py                    # Application configuration
 
 # project root:
  $ ls -1p
 ARCHITECTURE.md                    # High-level architecture documentation
-DETAILED_TECHNICAL_NOTES.md        # This file
+TECHNICAL_NOTES.md                 # This file
 README.md                          # Project overview
 bin/                               # Scripts and executables
 cli-readme.md                      # CLI documentation
@@ -179,11 +189,23 @@ The Playdo application includes a user management system for authentication and 
 
 2. **UserRepository** - This component manages database operations for users:
    - Create, read, update, and delete operations for users
-   - Password hashing and verification using Argon2
    - Case-insensitive email uniqueness validation
    - Username uniqueness validation
 
-3. **CLI Tool** - A command-line interface for user management:
+3. **UserService** - This component handles user authentication and management:
+   - User creation with password hashing
+   - User login and authentication
+   - User updates with validation
+   - Password complexity validation (via the validators module)
+   - Uniqueness validation for email and username
+   - Password hashing and verification using Argon2
+   - Serves as central point for all user-related operations
+
+4. **Validators Module** - Provides standalone validation functions:
+   - Password complexity validation (12+ characters, mix of letters and numbers)
+   - Reusable across different parts of the application
+
+5. **CLI Tool** - A command-line interface for user management:
    - Create users with secure password handling
    - List all users
    - Get user details by ID, username, or email
@@ -192,18 +214,18 @@ The Playdo application includes a user management system for authentication and 
    - Automatic backup of user data before destructive operations
    - Logging of all user management operations
 
-4. **Security Features**:
+6. **Security Features**:
    - Passwords are never stored in plain text
    - Each user has a unique salt for password hashing
    - Argon2 is used for secure password hashing
    - Password validation ensures strong passwords (12+ characters, mix of letters and numbers)
    - Confirmation required for destructive operations (admin creation, admin status change, deletion)
 
-5. **Usage**:
-   - The CLI tool is accessible via the `user_cli.sh` script
-   - Commands: create, list, get, update, delete
-   - Example: `./user_cli.sh create --username johndoe --email john@example.com`
-   - Example: `./user_cli.sh update --id 1 --username newname --email new@example.com --password --admin true`
+7. **Authentication Flow**:
+   - User provides username and password to `/login` endpoint
+   - UserService validates credentials and returns the user if valid
+   - JWT token is generated with user information and claims
+   - Client uses the JWT token for subsequent authenticated requests
 
 ## Key Design Principles
 
@@ -211,17 +233,22 @@ Playdo follows several key design principles:
 
 1. **Repository Pattern** - Database operations are encapsulated in repository classes.
 
-2. **Context Managers** - Resources like database connections are managed with context managers for proper cleanup.
+2. **Service Layer Pattern** - Business logic is encapsulated in service classes that use the repositories.
 
-3. **Type Safety** - Extensive use of type hints and Pydantic models for runtime type checking.
+3. **Separation of Concerns** - Clear separation between data access (repositories), business logic (services), and presentation (endpoints).
+   Note: the web layer should ideally call services which can manage intermediate application logic and then those can call repositories.
 
-4. **Environment-based Configuration** - All configuration is managed via environment variables.
+4. **Context Managers** - Resources like database connections are managed with context managers for proper cleanup.
 
-5. **REST API Design** - The backend exposes a RESTful API for the frontend to consume.
+5. **Type Safety** - Extensive use of type hints and Pydantic models for runtime type checking.
 
-6. **Seamless Context Sharing** - The system automatically ensures the AI tutor has the context it needs without the student having to think about it.
+6. **Environment-based Configuration** - All configuration is managed via environment variables.
 
-7. **Secure Authentication** - User authentication is handled securely with proper password hashing and validation.
+7. **REST API Design** - The backend exposes a RESTful API for the frontend to consume.
+
+8. **Seamless Context Sharing** - The system automatically ensures the AI tutor has the context it needs without the student having to think about it.
+
+9. **Secure Authentication** - User authentication is handled securely with proper password hashing and validation.
 
 ## Technical Dependencies
 
