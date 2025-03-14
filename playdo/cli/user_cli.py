@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import Optional
 
 from playdo.svc.user_service import UserService, user_service
-from playdo.user_repository import UserNotFoundError
 from playdo.models import User
 from playdo.settings import settings
 from playdo.validators import validate_password_complexity
@@ -339,9 +338,6 @@ def delete(id: int, force: bool):
             user_svc.delete_user(id)
             logger.info(f"User deleted: id={id}, username={user.username}, email={user.email}")
             click.echo("User deleted successfully.")
-        except UserNotFoundError as e:
-            click.echo(f"Error: {str(e)}")
-            logger.error(f"User deletion failed: {str(e)}, user_id={id}")
         except Exception as e:
             click.echo(f"Error: {str(e)}")
             logger.error(f"User deletion failed: {str(e)}, user_id={id}")

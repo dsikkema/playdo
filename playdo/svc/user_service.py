@@ -15,24 +15,24 @@ class UserService:
         self.user_repo = user_repo
         self.password_hasher = password_hasher
 
-    def validate_unique_username_email(self, id: Optional[int], username: Optional[str], email: Optional[str]) -> None:
-        if email is not None:
-            user_with_email = self.get_user_by_email(email)
-            # id is None for the case of creating a user: then, there should be NO user with same email
-            # otherwise, user with same email must not be a different user_id
-            if user_with_email and (id is None or user_with_email.id != id):
-                raise UserAlreadyExistsError(f"Email {email} already exists.")
+    def validate_unique_email(self, existing_user_id: Optional[int], email: str) -> None:
+        user_with_email = self.get_user_by_email(email)
+        # id is None for the case of creating a user: then, there should be NO user with same email
+        # otherwise, user with same email must not be a different user_id
+        if user_with_email and (existing_user_id is None or user_with_email.id != existing_user_id):
+            raise UserAlreadyExistsError(f"Email {email} already exists.")
 
-        if username is not None:
-            user_with_username = self.get_user_by_username(username)
-            if user_with_username and (id is None or user_with_username.id != id):
-                raise UserAlreadyExistsError(f"Username {username} already exists.")
+    def validate_unique_username(self, existing_user_id: Optional[int], username: str) -> None:
+        user_with_username = self.get_user_by_username(username)
+        if user_with_username and (existing_user_id is None or user_with_username.id != existing_user_id):
+            raise UserAlreadyExistsError(f"Username {username} already exists.")
 
     def create_user(self, username: str, email: str, is_admin: bool, password: str) -> User:
         """Create a new user with a password."""
         if not validate_password_complexity(password):
             raise ValueError("Password does not meet complexity requirements.")
-        self.validate_unique_username_email(None, username, email)
+        self.validate_unique_email(None, email)
+        self.validate_unique_username(None, username)
         password_hash, password_salt = self._hash_password(password)
         return self.user_repo.create_user(
             User(username=username, email=email, is_admin=is_admin, password_hash=password_hash, password_salt=password_salt)
@@ -59,13 +59,13 @@ class UserService:
             password_hash, password_salt = self._hash_password(new_password)
         if new_username is not None:
             username = new_username
+            self.validate_unique_username(user_id, username)
         if new_email is not None:
             email = new_email
+            self.validate_unique_email(user_id, email)
         if new_is_admin is not None:
             is_admin = new_is_admin
 
-        if new_username or new_email:
-            self.validate_unique_username_email(user_id, username, email)
         return self.user_repo.update_user(
             User(
                 id=user_id,
@@ -131,5 +131,9 @@ class UserService:
 
 @contextmanager
 def user_service(db_path: Path) -> Generator[UserService, None, None]:
+    """
+    This is exposed as a context manager so that it can keep UserRepo in the context manager, so the database
+    connection can be cleaned up
+    """
     with user_repository(db_path) as user_repo:
         yield UserService(user_repo, PasswordHasher())

@@ -274,10 +274,6 @@ The Playdo backend relies on several key technologies:
 
 10. **Click** - Command-line interface toolkit.
 
-## Cursor Rules Reminders:
-There are rules in the context window. They contain instructions for the AI writing code about how to properly design tests and verify functionality with
-running tests, linters, typecheckers, etc. ALWAYS think about how to properly implement these rules when writing code.
-
 ## AI Integration
 
 The Playdo application integrates with the Anthropic Claude API to generate AI responses:
@@ -304,3 +300,39 @@ The Playdo application integrates with the Anthropic Claude API to generate AI r
    - PlaydoMessage objects include additional metadata like editor code and outputs
    - These are converted to Anthropic's MessageParam objects for API requests
    - Anthropic Message objects are converted back to PlaydoMessage objects for internal use
+
+## Testing Strategy
+
+The Playdo application uses a comprehensive testing strategy that balances unit tests with integration tests:
+
+1. **Test Organization**
+   - Unit tests in `tests/svc/` for service layer components
+   - Integration tests in `tests/integration/` for database and API operations
+   - Test fixtures in `tests/conftest.py` for common test setup
+
+2. **Test Fixtures**
+   - `initialized_test_db_path`: Creates a temporary SQLite database with schema
+   - `test_app`: Creates a Flask test application
+   - `test_user`: Creates a test user with known credentials
+   - `authorized_client`: Creates an authenticated test client which will always attach a valid Authorization header
+
+3. **Integration Testing Approach**
+   - For components whose primary job is data integration (repositories, CLI apps, API endpoints), we use real database connections
+   - Integration tests verify actual database operations, SQL queries, and API endpoints
+   - Each test gets a fresh database instance via the `initialized_test_db_path` fixture
+
+4. **Unit Testing Approach**
+   - Service layer components use mocked dependencies
+   - Focus on business logic and validation
+   - Verify correct interaction with dependencies
+   - Example: UserService tests mock UserRepository to verify password hashing and validation
+
+5. **Test Coverage**
+   - Tests cover both success and failure cases
+   - Edge cases and error conditions are explicitly tested
+   - Database constraints and unique validations are verified
+   - API endpoints are tested with both valid and invalid inputs
+
+## Cursor Rules Reminders:
+There are rules in the context window. They contain instructions for the AI writing code about how to properly design tests and verify functionality with
+running tests, linters, typecheckers, etc. ALWAYS think about how to properly implement these rules when writing code.
