@@ -18,7 +18,7 @@ Need a `.docker.env` file with the following variables:
 ```
 PLAYDO_DATABASE_PATH=/app/data/playdo.db # path inside the container
 PLAYDO_DEBUG=true
-PLAYDO_ANTHROPIC_MODEL=claude-3-haiku-20240307
+PLAYDO_ANTHROPIC_MODEL=claude-3-7-sonnet-latest
 PLAYDO_TESTING=false
 ANTHROPIC_API_KEY=etc
 PLAYDO_JWT_SECRET_KEY=something_very_secure_and_random
@@ -36,5 +36,3 @@ docker exec -it my_playdo_backend /bin/bash
 playdo-users list
 playdo-cli
 ```
-
-
