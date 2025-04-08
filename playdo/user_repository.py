@@ -14,6 +14,7 @@ from pathlib import Path
 
 from playdo.models import User
 from playdo.errors import UserAlreadyExistsError, UserNotFoundError
+
 logger = logging.getLogger("playdo")
 
 # Type alias for parameters to SQLite query

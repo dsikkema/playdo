@@ -137,7 +137,7 @@ class User(BaseModel):
     @classmethod
     def username_must_be_valid(cls, v):
         """
-        TOODO: for both these validations, dedicated validation errors in a separate module 
+        TOODO: for both these validations, dedicated validation errors in a separate module
         """
         if len(v) < 4:
             raise ValueError("Username must be at least 4 characters")

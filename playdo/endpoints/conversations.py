@@ -6,7 +6,7 @@ TOODO:
 
 from typing import cast
 import logging
-from flask import Blueprint, jsonify, request, current_app
+from flask import Blueprint, jsonify, request, current_app, abort
 from flask.typing import ResponseReturnValue
 import sqlite3
 from flask_jwt_extended import jwt_required, current_user
@@ -24,16 +24,25 @@ conversations_bp = Blueprint("conversations", __name__)
 def get_app() -> PlaydoApp:
     return cast(PlaydoApp, current_app)
 
-def get_current_user() -> User:
-    return cast(User, current_user)
+
+def get_current_user_id() -> int:
+    """Get the current authenticated user ID, ensuring it's a valid integer."""
+    user = cast(User, current_user)
+    if user is None or user.id is None:
+        # This shouldn't happen with @jwt_required, but just in case
+        abort(401, "Authentication required")
+    assert isinstance(user.id, int)  # if you're a typechecker, you LOVE this line.
+    return user.id
+
 
 @conversations_bp.route("/conversations", methods=["GET"])
 @jwt_required()
 def list_conversations() -> ResponseReturnValue:
     """Get a list of all conversation IDs."""
     app = get_app()
+    user_id = get_current_user_id()
     with app.conversation_service() as conv_service:
-        conversation_ids = conv_service.list_conversations(get_current_user().id)
+        conversation_ids = conv_service.list_conversations(user_id)
     return jsonify({"conversation_ids": conversation_ids})
 
 
@@ -42,8 +51,9 @@ def list_conversations() -> ResponseReturnValue:
 def create_conversation() -> ResponseReturnValue:
     """Create a new conversation."""
     app = get_app()
+    user_id = get_current_user_id()
     with app.conversation_service() as conv_service:
-        conversation = conv_service.create_conversation(get_current_user().id)
+        conversation = conv_service.create_conversation(user_id)
     return jsonify(conversation.model_dump()), 201
 
 
@@ -52,9 +62,10 @@ def create_conversation() -> ResponseReturnValue:
 def get_conversation(conversation_id: int) -> ResponseReturnValue:
     """Get a specific conversation with all its messages."""
     app = get_app()
+    user_id = get_current_user_id()
     with app.conversation_service() as conv_service:
         try:
-            conversation = conv_service.get_conversation_for_user(conversation_id, get_current_user().id)
+            conversation = conv_service.get_conversation_for_user(conversation_id, user_id)
             return jsonify(conversation.model_dump())
         except ConversationNotFoundError as e:
             return jsonify({"error": str(e)}), 404
@@ -121,11 +132,12 @@ def send_new_message(conversation_id: int) -> ResponseReturnValue:
         logger.debug(f"Stderr included (length: {len(stderr)})")
 
     app = get_app()
+    user_id = get_current_user_id()
     with app.conversation_service() as conv_service:
         try:
             # Create user message with code context
             new_msg = PlaydoMessage.user_message(user_query, editor_code, stdout, stderr)
-            updated_conversation = conv_service.send_new_message(conversation_id, get_current_user().id, new_msg)
+            updated_conversation = conv_service.send_new_message(conversation_id, user_id, new_msg)
             return jsonify(updated_conversation.model_dump())
         except ConversationNotFoundError as e:
             logger.exception(e)

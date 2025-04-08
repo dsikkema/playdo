@@ -3,7 +3,7 @@ from argon2 import PasswordHasher
 import pytest
 from playdo.svc.user_service import UserService
 from playdo.user_repository import UserRepository
-from playdo.errors import ConversationNotFoundError, UserAlreadyExistsError
+from playdo.errors import UserAlreadyExistsError
 from playdo.models import User
 
 

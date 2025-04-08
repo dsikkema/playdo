@@ -5,6 +5,7 @@ with minimal redunant DB queries.
 
 Also handles send_message which is a more involved back-and-forth between various components.
 """
+
 from playdo.conversation_repository import ConversationRepository
 from playdo.models import ConversationHistory, PlaydoMessage
 from playdo.errors import NotAuthorizedForConversation
@@ -12,11 +13,13 @@ from playdo.response_getter import ResponseGetter
 import logging
 
 logger = logging.getLogger(__name__)
+
+
 class ConversationService:
     def __init__(self, conversation_repository: ConversationRepository):
         self.conversation_repository = conversation_repository
 
-    def list_conversations(self, user_id: int) -> list[ConversationHistory]:
+    def list_conversations(self, user_id: int) -> list[int]:
         return self.conversation_repository.get_all_conversation_ids_for_user(user_id)
 
     def create_conversation(self, user_id: int) -> ConversationHistory:
@@ -27,7 +30,7 @@ class ConversationService:
         if conversation.user_id != user_id:
             raise NotAuthorizedForConversation(conversation_id, user_id)
         return conversation
-    
+
     def send_new_message(self, conversation_id: int, user_id: int, new_msg: PlaydoMessage) -> ConversationHistory:
         conversation = self.get_conversation_for_user(conversation_id, user_id)
         if conversation.user_id != user_id:
@@ -42,6 +45,3 @@ class ConversationService:
         updated_conversation = self.conversation_repository.add_messages_to_conversation(conversation_id, [resp_message])
         # Return the updated conversation with the new messages
         return updated_conversation
-
-
-        

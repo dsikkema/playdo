@@ -17,7 +17,7 @@ from typing import Optional
 
 import anthropic
 from playdo.response_getter import ResponseGetter
-from playdo.conversation_repository import ConversationRepository
+from playdo.svc.conversation_service import ConversationService
 from playdo.models import ConversationHistory, PlaydoMessage
 import logging
 
@@ -25,15 +25,16 @@ logger = logging.getLogger("playdo")
 
 
 class HistoricalConversation:
-    def __init__(self, conversation_history: ConversationRepository, response_getter: ResponseGetter):
-        self.conversation_history = conversation_history
+    def __init__(self, conversation_service: ConversationService, response_getter: ResponseGetter, user_id: int = 1):
+        self.conversation_service = conversation_service
         self.response_getter = response_getter
+        self.user_id = user_id
 
     def _prompt_for_conversation_id(self) -> int | None:
         """
         Display available conversation IDs and prompt the user to select one.
         """
-        conversation_ids = self.conversation_history.get_all_conversation_ids_for_user()
+        conversation_ids = self.conversation_service.list_conversations(self.user_id)
 
         if not conversation_ids:
             return None
@@ -65,11 +66,11 @@ class HistoricalConversation:
 
         # load conversation from database if one is chosen
         if conversation_id is not None:
-            conversation = self.conversation_history.get_conversation(conversation_id)
+            conversation = self.conversation_service.get_conversation_for_user(conversation_id, self.user_id)
             logger.debug(f"Loaded conversation {conversation=}")
         else:
             logger.debug("No conversation ID provided, starting new conversation")
-            conversation = self.conversation_history.create_new_conversation()
+            conversation = self.conversation_service.create_conversation(self.user_id)
             print(f"You're in a brand new conversation: ID={conversation.id}")
             logger.debug(f"Created new conversation {conversation=}")
 
@@ -104,15 +105,15 @@ class HistoricalConversation:
                 break
 
             try:
-                # Get updated messages from response getter
+                # Create user message
                 user_msg = PlaydoMessage.user_message(query=user_message_str)
-                conversation = self.conversation_history.add_messages_to_conversation(conversation.id, [user_msg])
-                response: PlaydoMessage = self.response_getter._get_next_assistant_resp(conversation.messages)
 
-                # Save only the new messages
-                conversation = self.conversation_history.add_messages_to_conversation(conversation.id, [response])
+                # Send message using the conversation service
+                updated_conversation = self.conversation_service.send_new_message(conversation.id, self.user_id, user_msg)
+                conversation = updated_conversation
 
                 # Print the assistant's response (last message)
+                response = conversation.messages[-1]
                 print(f"\nAssistant: {response.content[0].text}\n")
 
             except anthropic.InternalServerError as e:
