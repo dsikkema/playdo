@@ -11,6 +11,7 @@ from argon2 import PasswordHasher
 from flask import Flask
 
 from playdo.conversation_repository import ConversationRepository, conversation_repository
+from playdo.svc.conversation_service import ConversationService
 from playdo.svc.user_service import UserService
 from playdo.user_repository import user_repository
 from playdo.settings import settings
@@ -22,6 +23,11 @@ class PlaydoApp(Flask):
         db_path = Path(settings.DATABASE_PATH)
         with conversation_repository(db_path) as repository:
             yield repository
+
+    @contextmanager
+    def conversation_service(self) -> Generator[ConversationService, None, None]:
+        with self.conversation_repository() as conv_repository:
+            yield ConversationService(conv_repository)
 
     @contextmanager
     def user_service(self) -> Generator[UserService, None, None]:

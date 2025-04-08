@@ -7,7 +7,7 @@ from playdo.user_repository import UserRepository, user_repository
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from playdo.validators import validate_password_complexity
-from playdo.user_repository import UserAlreadyExistsError
+from playdo.errors import UserAlreadyExistsError
 
 
 class UserService:

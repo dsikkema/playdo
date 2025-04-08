@@ -33,7 +33,7 @@ class HistoricalConversation:
         """
         Display available conversation IDs and prompt the user to select one.
         """
-        conversation_ids = self.conversation_history.get_all_conversation_ids()
+        conversation_ids = self.conversation_history.get_all_conversation_ids_for_user()
 
         if not conversation_ids:
             return None

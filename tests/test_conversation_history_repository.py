@@ -4,6 +4,7 @@ from typing import Generator
 
 import pytest
 from playdo.conversation_repository import conversation_repository, ConversationRepository
+from playdo.errors import ConversationNotFoundError
 from playdo.models import PlaydoMessage, PlaydoContent
 from unittest.mock import MagicMock, patch
 
@@ -68,20 +69,20 @@ def test_get_conversation_empty(repository: ConversationRepository) -> None:
 
 def test_get_conversation_not_found(repository: ConversationRepository) -> None:
     """Test attempting to retrieve a non-existent conversation."""
-    with pytest.raises(ValueError, match="Conversation with id .* not found"):
+    with pytest.raises(ConversationNotFoundError, match="Conversation with id .* not found"):
         repository.get_conversation(9999)  # Assuming 9999 is a non-existent ID
 
 
 def test_get_all_conversation_ids_empty(repository: ConversationRepository) -> None:
     """Test getting all conversation IDs when database is empty."""
-    assert repository.get_all_conversation_ids() == []
+    assert repository.get_all_conversation_ids_for_user() == []
 
 
 def test_get_all_conversation_ids_with_data(repository: ConversationRepository) -> None:
     """Test getting all conversation IDs when database has conversations."""
     conversation1 = repository.create_new_conversation()
     conversation2 = repository.create_new_conversation()
-    ids = repository.get_all_conversation_ids()
+    ids = repository.get_all_conversation_ids_for_user()
     assert conversation1.id in ids
     assert conversation2.id in ids
     assert len(ids) == 2

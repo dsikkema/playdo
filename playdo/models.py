@@ -113,6 +113,7 @@ class PlaydoMessage(BaseModel):
 
 class ConversationHistory(BaseModel):
     messages: list[PlaydoMessage]
+    user_id: int
     id: int
     created_at: Optional[datetime.datetime] = None
     updated_at: Optional[datetime.datetime] = None
@@ -135,6 +136,9 @@ class User(BaseModel):
     @field_validator("username")
     @classmethod
     def username_must_be_valid(cls, v):
+        """
+        TOODO: for both these validations, dedicated validation errors in a separate module 
+        """
         if len(v) < 4:
             raise ValueError("Username must be at least 4 characters")
         if not re.match(r"^[a-zA-Z0-9_]+$", v):

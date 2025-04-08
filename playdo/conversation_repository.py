@@ -1,9 +1,11 @@
 """
 This module implements a class for managing the conversation history.
 
-The schema of the database is stored in schema.sql, which defines two tables:
+The schema of the database is stored in schema.sql, which defines two tables related to conversations:
 - conversation: Stores conversation metadata
 - message: Stores individual messages with sequence ordering
+
+Each conversation and message is associated with a user, and a user can only access conversations and messages associated with them.
 """
 
 import json
@@ -12,6 +14,7 @@ import sqlite3
 from contextlib import contextmanager
 from typing import Generator, List
 from pathlib import Path
+from playdo.errors import ConversationNotFoundError
 from playdo.models import ConversationHistory, PlaydoContent, PlaydoMessage
 
 logger = logging.getLogger("playdo")
@@ -27,11 +30,11 @@ class ConversationRepository:
         self.conn = sqlite3.connect(str(db_path))
         self.cursor = self.conn.cursor()
 
-    def create_new_conversation(self) -> ConversationHistory:
+    def create_new_conversation(self, user_id: int) -> ConversationHistory:
         """
         Create a new conversation. There will be no messages in the conversation initially.
         """
-        self.cursor.execute("INSERT INTO conversation DEFAULT VALUES")
+        self.cursor.execute("INSERT INTO conversation (user_id) VALUES (?)", (user_id,))
         self.conn.commit()
         conversation_id = self.cursor.lastrowid
         assert conversation_id is not None
@@ -46,7 +49,7 @@ class ConversationRepository:
         self.cursor.execute("SELECT * FROM conversation WHERE id = ?", (conversation_id,))
         conv_row = self.cursor.fetchone()
         if conv_row is None:
-            raise ValueError(f"Conversation with id {conversation_id} not found")
+            raise ConversationNotFoundError(conversation_id)
 
         # Get the next sequence number
         self.cursor.execute(
@@ -74,10 +77,10 @@ class ConversationRepository:
     def get_conversation(self, id: int) -> ConversationHistory:
         """Load a conversation and all its messages."""
         # First verify conversation exists
-        self.cursor.execute("SELECT created_at, updated_at FROM conversation WHERE id = ?", (id,))
+        self.cursor.execute("SELECT created_at, updated_at, user_id FROM conversation WHERE id = ?", (id,))
         conv_row = self.cursor.fetchone()
         if conv_row is None:
-            raise ValueError(f"Conversation with id {id} not found")
+            raise ConversationNotFoundError(id)
 
         # Get all messages in sequence order
         self.cursor.execute(
@@ -92,10 +95,11 @@ class ConversationRepository:
         logger.debug(f"{conv_row=}")
         created_at = conv_row[0]
         updated_at = conv_row[1]
-        return ConversationHistory(id=id, created_at=created_at, updated_at=updated_at, messages=messages)
+        user_id = conv_row[2]
+        return ConversationHistory(id=id, created_at=created_at, updated_at=updated_at, messages=messages, user_id=user_id)
 
-    def get_all_conversation_ids(self) -> list[int]:
-        self.cursor.execute("SELECT id FROM conversation")
+    def get_all_conversation_ids_for_user(self, user_id: int) -> list[int]:
+        self.cursor.execute("SELECT id FROM conversation WHERE user_id = ?", (user_id,))
         return [row[0] for row in self.cursor.fetchall()]
 
     def cleanup(self) -> None:

@@ -9,11 +9,11 @@ import logging
 from flask import Blueprint, jsonify, request, current_app
 from flask.typing import ResponseReturnValue
 import sqlite3
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required, current_user
 
+from playdo.errors import NotAuthorizedForConversation, ConversationNotFoundError
 from playdo.playdo_app import PlaydoApp
-from playdo.response_getter import ResponseGetter
-from playdo.models import PlaydoMessage
+from playdo.models import PlaydoMessage, User
 
 logger = logging.getLogger(__name__)
 
@@ -24,14 +24,16 @@ conversations_bp = Blueprint("conversations", __name__)
 def get_app() -> PlaydoApp:
     return cast(PlaydoApp, current_app)
 
+def get_current_user() -> User:
+    return cast(User, current_user)
 
 @conversations_bp.route("/conversations", methods=["GET"])
 @jwt_required()
 def list_conversations() -> ResponseReturnValue:
     """Get a list of all conversation IDs."""
     app = get_app()
-    with app.conversation_repository() as conv_repository:
-        conversation_ids = conv_repository.get_all_conversation_ids()
+    with app.conversation_service() as conv_service:
+        conversation_ids = conv_service.list_conversations(get_current_user().id)
     return jsonify({"conversation_ids": conversation_ids})
 
 
@@ -40,8 +42,8 @@ def list_conversations() -> ResponseReturnValue:
 def create_conversation() -> ResponseReturnValue:
     """Create a new conversation."""
     app = get_app()
-    with app.conversation_repository() as conv_repository:
-        conversation = conv_repository.create_new_conversation()
+    with app.conversation_service() as conv_service:
+        conversation = conv_service.create_conversation(get_current_user().id)
     return jsonify(conversation.model_dump()), 201
 
 
@@ -50,12 +52,14 @@ def create_conversation() -> ResponseReturnValue:
 def get_conversation(conversation_id: int) -> ResponseReturnValue:
     """Get a specific conversation with all its messages."""
     app = get_app()
-    with app.conversation_repository() as conv_repository:
+    with app.conversation_service() as conv_service:
         try:
-            conversation = conv_repository.get_conversation(conversation_id)
+            conversation = conv_service.get_conversation_for_user(conversation_id, get_current_user().id)
             return jsonify(conversation.model_dump())
-        except ValueError:
-            return jsonify({"error": f"Conversation with id {conversation_id} not found"}), 404
+        except ConversationNotFoundError as e:
+            return jsonify({"error": str(e)}), 404
+        except NotAuthorizedForConversation as e:
+            return jsonify({"error": str(e)}), 403
 
 
 @conversations_bp.route("/conversations/<int:conversation_id>/send_message", methods=["POST"])
@@ -117,25 +121,18 @@ def send_new_message(conversation_id: int) -> ResponseReturnValue:
         logger.debug(f"Stderr included (length: {len(stderr)})")
 
     app = get_app()
-    with app.conversation_repository() as conv_repository:
-        response_getter = ResponseGetter()
+    with app.conversation_service() as conv_service:
         try:
             # Create user message with code context
-            user_msg = PlaydoMessage.user_message(query=user_query, editor_code=editor_code, stdout=stdout, stderr=stderr)
-            updated_conversation = conv_repository.add_messages_to_conversation(conversation_id, [user_msg])
-
-            # Get the assistant's response (using the existing conversation messages plus our new user message)
-            resp_message: PlaydoMessage = response_getter._get_next_assistant_resp(updated_conversation.messages)
-
-            logger.debug(f"New message: {resp_message}")
-            # Save the new messages
-            updated_conversation = conv_repository.add_messages_to_conversation(conversation_id, [resp_message])
-            logger.debug(f"Updated conversation: {updated_conversation.model_dump()}")
-            # Return the updated conversation with the new messages
+            new_msg = PlaydoMessage.user_message(user_query, editor_code, stdout, stderr)
+            updated_conversation = conv_service.send_new_message(conversation_id, get_current_user().id, new_msg)
             return jsonify(updated_conversation.model_dump())
-        except ValueError as e:
+        except ConversationNotFoundError as e:
             logger.exception(e)
-            return jsonify({"error": f"Conversation with id {conversation_id} not found"}), 404
+            return jsonify({"error": str(e)}), 404
+        except NotAuthorizedForConversation as e:
+            logger.exception(e)
+            return jsonify({"error": str(e)}), 403
         except sqlite3.Error as e:
             logger.exception(e)
             return jsonify({"error": "sorry"}), 500
