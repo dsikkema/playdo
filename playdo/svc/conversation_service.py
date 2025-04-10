@@ -19,7 +19,7 @@ class ConversationService:
     def __init__(self, conversation_repository: ConversationRepository):
         self.conversation_repository = conversation_repository
 
-    def list_conversations(self, user_id: int) -> list[int]:
+    def list_conversations_for_user(self, user_id: int) -> list[int]:
         return self.conversation_repository.get_all_conversation_ids_for_user(user_id)
 
     def create_conversation(self, user_id: int) -> ConversationHistory:

@@ -42,7 +42,7 @@ def list_conversations() -> ResponseReturnValue:
     app = get_app()
     user_id = get_current_user_id()
     with app.conversation_service() as conv_service:
-        conversation_ids = conv_service.list_conversations(user_id)
+        conversation_ids = conv_service.list_conversations_for_user(user_id)
     return jsonify({"conversation_ids": conversation_ids})
 
 
