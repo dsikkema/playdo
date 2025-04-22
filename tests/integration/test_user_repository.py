@@ -4,7 +4,8 @@ Tests for the UserRepository.
 
 import pytest
 from playdo.models import User
-from playdo.user_repository import UserRepository, UserAlreadyExistsError, UserNotFoundError
+from playdo.user_repository import UserRepository
+from playdo.errors import UserAlreadyExistsError, UserNotFoundError
 
 
 def test_create_user(initialized_test_db_path):

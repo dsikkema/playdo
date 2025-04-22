@@ -17,23 +17,26 @@ from typing import Optional
 
 import anthropic
 from playdo.response_getter import ResponseGetter
-from playdo.conversation_repository import ConversationRepository
-from playdo.models import ConversationHistory, PlaydoMessage
+from playdo.svc.conversation_service import ConversationService
+from playdo.models import ConversationHistory, PlaydoMessage, User
 import logging
+
+from playdo.svc.user_service import UserService
 
 logger = logging.getLogger("playdo")
 
 
 class HistoricalConversation:
-    def __init__(self, conversation_history: ConversationRepository, response_getter: ResponseGetter):
-        self.conversation_history = conversation_history
+    def __init__(self, conversation_service: ConversationService, response_getter: ResponseGetter, user_service: UserService):
+        self.conversation_service = conversation_service
         self.response_getter = response_getter
+        self.user_service = user_service
 
-    def _prompt_for_conversation_id(self) -> int | None:
+    def _prompt_for_conversation_id(self, user_id: int) -> int | None:
         """
         Display available conversation IDs and prompt the user to select one.
         """
-        conversation_ids = self.conversation_history.get_all_conversation_ids()
+        conversation_ids = self.conversation_service.list_conversations_for_user(user_id)
 
         if not conversation_ids:
             return None
@@ -58,25 +61,48 @@ class HistoricalConversation:
             valid_input_received = True
         return choice
 
+    def _prompt_for_user_id(self) -> int:
+        existing_users: list[User] = self.user_service.list_users()
+        valid_user_ids = []
+        user_id = None
+
+        if len(existing_users) == 0:
+            raise ValueError("No users found")
+
+        print("Available users:")
+        for user in existing_users:
+            assert user.id is not None
+            valid_user_ids.append(user.id)
+            print(f"{user.id}: {user.username}")
+
+        while user_id is None:
+            user_id = input("Enter the ID of the user to load: ")
+            if not user_id.isdigit() or int(user_id) not in valid_user_ids:
+                print("Invalid input. Please enter a valid user ID.")
+                continue
+
+        return int(user_id)
+
     def run_historical_conversation(self) -> None:
         # get conversation ID from user
-        conversation_id = self._prompt_for_conversation_id()
+        user_id = self._prompt_for_user_id()
+        conversation_id = self._prompt_for_conversation_id(user_id)
         conversation: Optional[ConversationHistory]
 
         # load conversation from database if one is chosen
         if conversation_id is not None:
-            conversation = self.conversation_history.get_conversation(conversation_id)
+            conversation = self.conversation_service.get_conversation_for_user(conversation_id, user_id)
             logger.debug(f"Loaded conversation {conversation=}")
         else:
             logger.debug("No conversation ID provided, starting new conversation")
-            conversation = self.conversation_history.create_new_conversation()
+            conversation = self.conversation_service.create_conversation(user_id)
             print(f"You're in a brand new conversation: ID={conversation.id}")
             logger.debug(f"Created new conversation {conversation=}")
 
         # run the chatloop, passing in the messages
-        self._chatloop(conversation)
+        self._chatloop(conversation, user_id)
 
-    def _chatloop(self, conversation: ConversationHistory) -> None:
+    def _chatloop(self, conversation: ConversationHistory, user_id: int) -> None:
         """
         Functions by taking all messages from conversation history (which is an empty list if it's a new
         conversation), and passing them into the response_getter, which returns a new message list
@@ -104,15 +130,14 @@ class HistoricalConversation:
                 break
 
             try:
-                # Get updated messages from response getter
+                # Create user message
                 user_msg = PlaydoMessage.user_message(query=user_message_str)
-                conversation = self.conversation_history.add_messages_to_conversation(conversation.id, [user_msg])
-                response: PlaydoMessage = self.response_getter._get_next_assistant_resp(conversation.messages)
 
-                # Save only the new messages
-                conversation = self.conversation_history.add_messages_to_conversation(conversation.id, [response])
+                # Send message using the conversation service
+                updated_conversation = self.conversation_service.send_new_message(conversation.id, user_id, user_msg)
 
                 # Print the assistant's response (last message)
+                response = updated_conversation.messages[-1]
                 print(f"\nAssistant: {response.content[0].text}\n")
 
             except anthropic.InternalServerError as e:

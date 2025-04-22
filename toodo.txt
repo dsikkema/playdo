@@ -1,0 +1,7 @@
+ - system prompt - tell playdo to tell the user to drive things by asking questions.
+ - frontend: make "send message" button clickable without message as long as there's code (maybe button says something different like "help" then)
+
+multiuser work (frontend):
+ - after changing user, frontend persists the last conversation ID from last user.
+ - all the state remains the same in the App, including code. Need to wipe just all state writ large?
+ - show logged in username at the top bar.

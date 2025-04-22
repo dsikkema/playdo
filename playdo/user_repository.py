@@ -13,23 +13,12 @@ from pathlib import Path
 
 
 from playdo.models import User
+from playdo.errors import UserAlreadyExistsError, UserNotFoundError
 
 logger = logging.getLogger("playdo")
 
 # Type alias for parameters to SQLite query
 SQLiteParam = Union[str, int, float, None]
-
-
-class UserAlreadyExistsError(Exception):
-    """Exception raised when a user already exists in the database."""
-
-    pass
-
-
-class UserNotFoundError(Exception):
-    """Exception raised when a user is not found in the database."""
-
-    pass
 
 
 class UserRepository:

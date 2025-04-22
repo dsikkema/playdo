@@ -21,17 +21,21 @@ The Playdo backend consists of several key components:
 
 2. **ConversationRepository** - Manages database operations for storing and retrieving conversations and messages in SQLite.
 
-3. **UserRepository** - Manages database operations for user authentication and management in SQLite.
+3. **ConversationService** - Handles conversation operations including authorization checks (ensuring users can only access their own conversations), message sending, and coordination between repositories and AI response generation.
 
-4. **UserService** - Handles user management operations including account creation, updates, authentication, password hashing, and validation.
+4. **UserRepository** - Manages database operations for user authentication and management in SQLite.
 
-5. **ResponseGetter** - Interfaces with the Anthropic Claude API to generate AI responses for user messages.
+5. **UserService** - Handles user management operations including account creation, updates, authentication, password hashing, and validation.
 
-6. **Models** - Pydantic data models that represent conversations, messages, content blocks, and users, ensuring type safety across the application.
+6. **ResponseGetter** - Interfaces with the Anthropic Claude API to generate AI responses for user messages.
 
-7. **Settings** - Configuration management via environment variables, making the application configurable across different environments.
+7. **Models** - Pydantic data models that represent conversations, messages, content blocks, and users, ensuring type safety across the application.
 
-8. **CLI Interface** - A command-line interface for interacting with the application, useful for testing and development. There is an
+8. **Settings** - Configuration management via environment variables, making the application configurable across different environments.
+
+9. **Errors** - Custom exception classes for handling specific error conditions like unauthorized access and not found errors.
+
+10. **CLI Interface** - A command-line interface for interacting with the application, useful for testing and development. There is an
    app at playdo/cli/user_cli.py that can be run with `python -m playdo.cli.user_cli`, which manages user accounts, and also an app at
    playdo/cli/cli_app.py that can be run with `python -m playdo.cli.cli_app`, which is used to view and send messages on conversations.
 
@@ -45,13 +49,18 @@ Playdo follows a modular architecture
 - **models.py** - Data models for the application using Pydantic.
 - **conversation_repository.py** - Database operations for conversations.
 - **user_repository.py** - Database operations for user management.
-- **svc/user_service.py** - User management and authentication service.
+- **svc/** - Service layer containing business logic
+  - **user_service.py** - User management and authentication service.
+  - **conversation_service.py** - Conversation management and authorization service.
+- **errors.py** - Custom exception classes for specific error conditions.
 - **validators.py** - Data validation utilities like password complexity validation.
 - **response_getter.py** - Anthropic Claude API integration.
 - **settings.py** - Application configuration via environment variables.
 - **db.py** - Database connection management.
 - **cli/** - Command-line interface for the application.
   - **user_cli.py** - CLI tool for user management.
+  - **cli_app.py** - CLI application for interacting with conversations.
+  - **historical_conversation.py** - Interactive CLI conversation interface.
 
 ## File Structure
 
@@ -71,10 +80,12 @@ playdo
 ├── endpoints
 │   ├── auth.py                    # Authentication endpoints (login)
 │   └── conversations.py           # API endpoints for conversations
+├── errors.py                      # Custom exception classes
 ├── models.py                      # Pydantic data models
 ├── playdo_app.py                  # Custom Flask application class
 ├── response_getter.py             # Anthropic Claude API integration
 ├── svc                            # Service layer
+│   ├── conversation_service.py    # Conversation management and authorization
 │   └── user_service.py            # User authentication and management services
 ├── validators.py                  # Data validation utilities
 └── settings.py                    # Application configuration
@@ -105,24 +116,39 @@ uv.lock                            # Dependency lock file
 
 The typical data flow in Playdo involves:
 
-1. **User Interaction** - The frontend sends user messages to the backend API.
+1. **User Authentication**
+   - The user logs in via the frontend which sends credentials to the `/login` endpoint
+   - The backend validates credentials and returns a JWT token
+   - The token contains the user's ID and is used for all subsequent authorized requests
 
-2. **API Processing** - The Flask endpoints receive requests and delegate to appropriate services:
-   - Requests for conversation history go to the ConversationRepository
-   - Requests for AI responses go first to ConversationRepository to get history, then to ResponseGetter
+2. **User-Based Conversation Access**
+   - Each conversation in the database is associated with a specific user (via `user_id`)
+   - When a user requests their conversations, the API only returns conversations owned by that user
+   - The ConversationService enforces authorization checks before allowing access to conversations
 
-3. **Database Operations** - ConversationRepository handles storing and retrieving conversations and messages from SQLite.
+3. **API Request Flow**
+   - Requests come to the Flask endpoints in the endpoints/ directory
+   - The endpoints extract user information from the JWT token
+   - Endpoints delegate to the appropriate service layer (ConversationService, UserService)
+   - Services implement business logic and authorization checks
+   - Services interact with repositories for data access
+   - Repositories handle the actual database operations
 
-4. **Conversation Saving Loop** - The application follows a clear pattern for saving conversations:
+4. **Authorization Checks**
+   - The ConversationService verifies that a user can only access or modify their own conversations
+   - If an unauthorized access attempt is detected, a NotAuthorizedForConversation exception is raised
+   - The API returns appropriate 403 Forbidden responses for unauthorized attempts
+
+5. **Conversation Saving Loop** - The application follows a clear pattern for saving conversations:
    - User message is first saved to the database
    - The complete conversation history (including the newly saved user message) is sent to the ResponseGetter
    - ResponseGetter returns only the assistant's response message
    - Assistant message is then saved to the database
    - This ensures that even if the AI response generation fails, the user's message is still preserved
 
-5. **AI Integration** - ResponseGetter sends conversation history to the Anthropic Claude API and receives AI responses.
+6. **AI Integration** - ResponseGetter sends conversation history to the Anthropic Claude API and receives AI responses.
 
-6. **Response Delivery** - The API sends responses back to the frontend for display to the user.
+7. **Response Delivery** - The API sends responses back to the frontend for display to the user.
 
 ## Code Editor Integration
 
@@ -227,6 +253,12 @@ The Playdo application includes a user management system for authentication and 
    - JWT token is generated with user information and claims
    - Client uses the JWT token for subsequent authenticated requests
 
+8. **Conversation Authorization**:
+   - Each conversation is associated with a specific user (via `user_id` field)
+   - Users can only view and modify their own conversations
+   - ConversationService enforces authorization by checking the user_id before allowing access
+   - Unauthorized access attempts are blocked with appropriate error responses
+
 ## Key Design Principles
 
 Playdo follows several key design principles:
@@ -249,6 +281,10 @@ Playdo follows several key design principles:
 8. **Seamless Context Sharing** - The system automatically ensures the AI tutor has the context it needs without the student having to think about it.
 
 9. **Secure Authentication** - User authentication is handled securely with proper password hashing and validation.
+
+10. **Authorization Model** - Strong separation of user data with explicit authorization checks to ensure users can only access their own data.
+
+11. **Custom Error Types** - Specific exception classes for different error conditions make error handling clearer and more robust.
 
 ## Technical Dependencies
 
@@ -326,12 +362,19 @@ The Playdo application uses a comprehensive testing strategy that balances unit 
    - Focus on business logic and validation
    - Verify correct interaction with dependencies
    - Example: UserService tests mock UserRepository to verify password hashing and validation
+   - Example: ConversationService tests mock ConversationRepository to verify authorization checks
 
-5. **Test Coverage**
+5. **Authorization Testing**
+   - Tests specifically verify that users can only access their own conversations
+   - Unauthorized access attempts are tested to ensure they properly raise exceptions
+   - The API's error handling for these exceptions is verified
+
+6. **Test Coverage**
    - Tests cover both success and failure cases
    - Edge cases and error conditions are explicitly tested
    - Database constraints and unique validations are verified
    - API endpoints are tested with both valid and invalid inputs
+   - Authorization checks are thoroughly tested to ensure proper security
 
 ## Cursor Rules Reminders:
 There are rules in the context window. They contain instructions for the AI writing code about how to properly design tests and verify functionality with
