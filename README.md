@@ -1,5 +1,8 @@
 # What?
 
+<img src="./playdo-screenshot.png" />
+
+
 Check out [product-vision.md](product-vision.md) for what it will be.
 
 Current state: chatbot with CLI and REST API support.
